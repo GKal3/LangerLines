@@ -81,19 +81,18 @@ fun Modifier.topShadow(
         )
     }
 }
-// Mappa stringa → drawable delle linee di Langer
-val regionDrawableMap = mapOf(
-    R.string.forehead  to R.drawable.langer_forehead,
-    R.string.cheek     to R.drawable.langer_cheek,
-    R.string.chest     to R.drawable.langer_female_chest,
-    R.string.abdomen   to R.drawable.langer_female_abdomen_front,
-    R.string.arm       to R.drawable.langer_female_arm,
-    R.string.leg       to R.drawable.langer_female_leg
-)
-
-@Preview
 @Composable
-fun RegionScreen(sex: String, onNavigateToCamera: (Int) -> Unit = {}) {
+fun RegionScreen(sex: String, onNavigateToUpload: (Int, String) -> Unit = { _, _ -> }) {
+
+    // Mappa stringa → drawable delle linee di Langer
+    val regionDrawableMap = mapOf(
+        R.string.forehead  to R.drawable.langer_forehead,
+        R.string.cheek     to R.drawable.langer_cheek,
+        R.string.chest     to R.drawable.langer_female_chest,
+        R.string.abdomen   to R.drawable.langer_female_abdomen_front,
+        R.string.arm       to R.drawable.langer_female_arm,
+        R.string.leg       to R.drawable.langer_female_leg
+    )
 
     Box(
         modifier = Modifier
@@ -266,10 +265,17 @@ fun RegionScreen(sex: String, onNavigateToCamera: (Int) -> Unit = {}) {
                     }
                 }
             }
+
             // Bottone Next
             Spacer(modifier = Modifier.weight(1f))
             Button(
-                onClick = { },
+                onClick = {
+                    selectedRegion?.let { region ->
+                        val drawable = regionDrawableMap[region] ?: 0
+                        val regionName = stringResource(region)
+                        onNavigateToUpload(drawable, regionName)
+                    }
+                },
                 enabled = selectedRegion != null, // ← disabilitato finché nessuna regione è selezionata
                 modifier = Modifier
                     .width(117.dp)
@@ -280,11 +286,16 @@ fun RegionScreen(sex: String, onNavigateToCamera: (Int) -> Unit = {}) {
                 Text(
                     text = stringResource(id = R.string.btn_next),
                     fontSize = 24.sp,
-                    fontFamily = robotoRegular,
-                    color = colorResource(id = R.color.b_trasl)
+                    fontFamily = robotoRegular
                 )
             }
             Spacer(modifier = Modifier.height(59.dp))
         }
     }
+}
+
+@Preview
+@Composable
+fun RegionScreenPreview() {
+    RegionScreen("male")
 }

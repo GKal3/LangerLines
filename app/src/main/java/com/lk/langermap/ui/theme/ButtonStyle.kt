@@ -19,7 +19,9 @@ val regionButtonShape = RoundedCornerShape(16.dp)
 @Composable
 fun nextButtonColors() = ButtonDefaults.buttonColors(
     containerColor = colorResource(id = R.color.teal),
-    disabledContainerColor = colorResource(id = R.color.teal_deact)
+    disabledContainerColor = colorResource(id = R.color.teal_deact),
+    contentColor = colorResource(id = R.color.b),
+    disabledContentColor = colorResource(id = R.color.b_trasl)
 )
 
 val nextButtonShape = RoundedCornerShape(16.dp)

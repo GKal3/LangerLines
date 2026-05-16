@@ -134,14 +134,11 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                         unfocusedBorderColor   = Color.Transparent,
                         focusedBorderColor     = Color.Transparent
                     ),
-                    shape = RoundedCornerShape(16.dp),               // ← bordi arrotondati
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
-                        .menuAnchor()
                         .fillMaxWidth()
                 )
 
-                // ⚠️  ExposedDropdownMenu eredita la larghezza dal parent MenuBox;
-                //     NON serve impostare larghezza a mano.
                 ExposedDropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false }
@@ -164,15 +161,10 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                 }
             }
 
-            Spacer(modifier = Modifier.height(40.dp))
-
-            // ── Bottone Next ────────────────────────────────────────────────
-            // ⚠️  Il pulsante è abilitato SOLO se l'utente ha scelto un sesso.
-            //     Quando abilitato chiama onNavigateToRegion() passando la
-            //     selezione a schermata successiva (estendi la lambda se serve).
+            Spacer(modifier = Modifier.weight(1f))
             Button(
                 onClick = {
-                    selectedSex?.let { onNavigateToRegion(it) }  // ← passa il valore
+                    selectedSex?.let { onNavigateToRegion(it) }
                 },
                 enabled = selectedSex != null,
                 modifier = Modifier
@@ -184,8 +176,7 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                 Text(
                     text = stringResource(id = R.string.btn_next),
                     fontSize = 24.sp,
-                    fontFamily = robotoRegular,
-                    color = colorResource(id = R.color.b_trasl)
+                    fontFamily = robotoRegular
                 )
             }
 

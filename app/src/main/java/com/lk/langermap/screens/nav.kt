@@ -36,7 +36,7 @@ fun nav() {
             )
         }
 
-        // SELEZIONE REGIONE  →  riceve {sex} dalla route
+        // SELEZIONE REGIONE
         composable(
             route = "region/{sex}",
             arguments = listOf(
@@ -46,9 +46,29 @@ fun nav() {
             val sex = backStackEntry.arguments?.getString("sex") ?: ""
             RegionScreen(
                 sex = sex,
-                onNavigateToCamera = { drawableResId ->
-                    navController.navigate("camera/$drawableResId")
+                onNavigateToUpload = { drawableResId, region ->
+                    navController.navigate("upload/$drawableResId/$region")
                 }
+            )
+        }
+
+        // UPLOAD
+        composable(
+            route = "upload/{regionDrawableResId}/{region}",
+            arguments = listOf(
+                navArgument("regionDrawableResId") { type = NavType.IntType },
+                navArgument("region") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val drawableResId = backStackEntry.arguments?.getInt("regionDrawableResId") ?: 0
+            val region = backStackEntry.arguments?.getString("region") ?: ""
+            UploadScreen(
+                regionDrawableResId = drawableResId,
+                regionName = region,
+                onNavigateToCamera = {
+                    navController.navigate("camera/$drawableResId")
+                },
+                onBack = { navController.popBackStack() }
             )
         }
 
