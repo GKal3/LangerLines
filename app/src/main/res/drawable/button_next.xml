@@ -1,0 +1,18 @@
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- DISABLED -->
+    <item android:state_enabled="false">
+        <shape>
+            <solid android:color="@color/teal_deact"/>
+            <corners android:radius="16dp"/>
+        </shape>
+    </item>
+
+    <!-- PRESSED -->
+    <item android:state_pressed="true">
+        <shape>
+            <solid android:color="@color/teal"/>
+            <corners android:radius="16dp"/>
+        </shape>
+    </item>
+</selector>

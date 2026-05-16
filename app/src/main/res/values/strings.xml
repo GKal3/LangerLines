@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Langer Map</string>
+    <string name="choose_sex">Choose your sex</string>
+    <string name="choose_region">Choose region</string>
+    <string name="choose_region_subtitle">Select the anatomical area to analyse</string>
+    <string name="forehead">Forehead</string>
+    <string name="cheek">Cheek</string>
+    <string name="abdomen">Abdomen</string>
+    <string name="arm">Arm</string>
+    <string name="leg">Leg</string>
+    <string name="chest">Chest</string>
+    <string name="btn_next">Next</string>
+</resources>
