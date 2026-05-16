@@ -34,6 +34,8 @@ fun UploadScreen(
     regionDrawableResId: Int = 0,
     regionName: String = "Forehead",
     onNavigateToCamera: () -> Unit = {},
+    onNavigateToSettings: (String) -> Unit = {},
+    onNavigateToOverlay: (String) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
@@ -237,7 +239,12 @@ fun UploadScreen(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Button(
-                onClick = { /* apri impostazioni */ },
+                onClick = {
+                    selectedImageUri?.let { uri ->
+                        onNavigateToSettings(uri.toString())
+                    }
+                },
+                enabled = selectedImageUri != null,
                 modifier = Modifier
                     .weight(1f)
                     .height(56.dp),
@@ -272,7 +279,11 @@ fun UploadScreen(
 
         // Next
         Button(
-            onClick = { /* naviga a overlay passando uri */ },
+            onClick = {
+                selectedImageUri?.let { uri ->
+                    onNavigateToOverlay(uri.toString())
+                }
+            },
             enabled = selectedImageUri != null,
             modifier = Modifier
                 .width(117.dp)

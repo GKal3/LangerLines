@@ -94,6 +94,15 @@ fun RegionScreen(sex: String, onNavigateToUpload: (Int, String) -> Unit = { _, _
         R.string.leg       to R.drawable.langer_female_leg
     )
 
+    val regionNames = mapOf(
+        R.string.forehead to stringResource(R.string.forehead),
+        R.string.cheek to stringResource(R.string.cheek),
+        R.string.chest to stringResource(R.string.chest),
+        R.string.abdomen to stringResource(R.string.abdomen),
+        R.string.arm to stringResource(R.string.arm),
+        R.string.leg to stringResource(R.string.leg)
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -272,7 +281,7 @@ fun RegionScreen(sex: String, onNavigateToUpload: (Int, String) -> Unit = { _, _
                 onClick = {
                     selectedRegion?.let { region ->
                         val drawable = regionDrawableMap[region] ?: 0
-                        val regionName = stringResource(region)
+                        val regionName = regionNames[region] ?: ""
                         onNavigateToUpload(drawable, regionName)
                     }
                 },

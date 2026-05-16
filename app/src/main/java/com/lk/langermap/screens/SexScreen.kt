@@ -136,6 +136,7 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                     ),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
+                        .menuAnchor()
                         .fillMaxWidth()
                 )
 

@@ -280,11 +280,14 @@ private fun takePhoto(
 
     imageCapture.takePicture(
         outputOptions,
-        executor,
+        ContextCompat.getMainExecutor(context),
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                 val uri = output.savedUri ?: Uri.fromFile(photoFile)
-                onSuccess(uri)
+                // ← torna al main thread prima di navigare
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    onSuccess(uri)
+                }
             }
 
             override fun onError(exc: ImageCaptureException) {

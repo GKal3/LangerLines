@@ -12,7 +12,7 @@ import android.net.Uri
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
-fun nav() {
+fun Navigation() {
     val navController = rememberNavController()
 
     NavHost(
@@ -67,8 +67,16 @@ fun nav() {
             UploadScreen(
                 regionDrawableResId = drawableResId,
                 regionName = region,
+                onNavigateToSettings = { photoUriString ->
+                    val encoded = URLEncoder.encode(photoUriString, "UTF-8")
+                    navController.navigate("edit/$encoded/$drawableResId")
+                },
                 onNavigateToCamera = {
                     navController.navigate("camera/$drawableResId")
+                },
+                onNavigateToOverlay = { photoUriString ->
+                    val encoded = URLEncoder.encode(photoUriString, "UTF-8")
+                    navController.navigate("overlay/$encoded/$drawableResId")
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -136,57 +144,42 @@ fun nav() {
                 photoUri   = photoUri,
                 overlayRes = drawableResId,
                 onBack     = { navController.popBackStack() },
-                onFinish   = { navController.popBackStack() }
+                onFinish = {
+                    val encoded = URLEncoder.encode(photoUri, "UTF-8")
+                    navController.navigate("output/$encoded")
+                }
+            )
+        }
+
+        // OUTPUT
+        composable(
+            route = "output/{photoUri}",
+            arguments = listOf(
+                navArgument("photoUri") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val encodedUri = backStackEntry.arguments?.getString("photoUri") ?: ""
+            val photoUri = URLDecoder.decode(encodedUri, "UTF-8")
+            OutputScreen(
+                photoUri = photoUri,
+                onBack = { navController.popBackStack() },
+                onNavigateToBackHome = {
+                    navController.navigate("backhome") {
+                        popUpTo("home") { inclusive = false }
+                    }
+                }
+            )
+        }
+
+        // BACKHOME
+        composable("backhome") {
+            BackHomeScreen(
+                onStartNewProject = {
+                    navController.navigate("home") {
+                        popUpTo("home") { inclusive = true }
+                    }
+                }
             )
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

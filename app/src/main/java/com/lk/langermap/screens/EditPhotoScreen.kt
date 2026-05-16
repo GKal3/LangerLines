@@ -1,18 +1,22 @@
 package com.lk.langermap.screens
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.Flip
-import androidx.compose.material.icons.filled.RotateRight
+import androidx.compose.material.icons.automirrored.filled.RotateRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,7 +29,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -64,11 +68,30 @@ fun EditPhotoScreen(
     var activeTool     by remember { mutableStateOf(EditTool.CROP) }
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
+    // Carica bitmap originale
     LaunchedEffect(photoUri) {
         if (photoUri != Uri.EMPTY) {
             withContext(Dispatchers.IO) {
                 originalBitmap = loadBitmapFromUri(context, photoUri)
             }
+        }
+    }
+
+    // Bitmap che accumula le modifiche confermate
+    var accumulatedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+
+    LaunchedEffect(originalBitmap) {
+        if (originalBitmap != null && accumulatedBitmap == null) {
+            accumulatedBitmap = originalBitmap
+        }
+    }
+
+    // 2. Quando cambi tool, applica le modifiche correnti all'accumulato
+    LaunchedEffect(activeTool) {
+        val src = accumulatedBitmap ?: return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            accumulatedBitmap = applyAllEdits(src, editState)
+            editState = EditState() // resetta lo stato per il nuovo tool
         }
     }
 
@@ -84,7 +107,7 @@ fun EditPhotoScreen(
             .background(white)
             .statusBarsPadding()
     ) {
-        // ── Top bar ──────────────────────────────────────────────────────────
+        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,8 +129,6 @@ fun EditPhotoScreen(
             )
         }
 
-        // ── Titolo ───────────────────────────────────────────────────────────
-        // FIX: padding(horizontal, bottom) non valido → usare start/end/bottom separati
         Text(
             text = "Edit patient's photo",
             fontSize = 28.sp,
@@ -116,7 +137,7 @@ fun EditPhotoScreen(
             modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)
         )
 
-        // ── Area immagine + tool attivo ──────────────────────────────────────
+        // Area tool
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -126,13 +147,13 @@ fun EditPhotoScreen(
         ) {
             when (activeTool) {
                 EditTool.CROP -> CropTool(
-                    bitmap        = originalBitmap,
+                    bitmap        = accumulatedBitmap,
                     editState     = editState,
                     onCropChanged = { editState = editState.copy(cropRect = it) },
                     onReset       = { editState = editState.copy(cropRect = Rect(0f, 0f, 1f, 1f)) }
                 )
                 EditTool.ROTATE -> RotateTool(
-                    bitmap         = originalBitmap,
+                    bitmap         = accumulatedBitmap,
                     editState      = editState,
                     onAngleChanged = { editState = editState.copy(angleDeg = it) },
                     onReset        = { editState = editState.copy(angleDeg = 0f) },
@@ -140,7 +161,7 @@ fun EditPhotoScreen(
                     lavLightTrasl  = lavLightTrasl
                 )
                 EditTool.MIRROR -> MirrorTool(
-                    bitmap        = originalBitmap,
+                    bitmap        = accumulatedBitmap,
                     editState     = editState,
                     onFlipV       = { editState = editState.copy(flipVertical   = !editState.flipVertical) },
                     onFlipH       = { editState = editState.copy(flipHorizontal = !editState.flipHorizontal) },
@@ -151,7 +172,7 @@ fun EditPhotoScreen(
             }
         }
 
-        // ── Edit tools divider ───────────────────────────────────────────────
+        // Divider "Edit tools"
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -171,7 +192,7 @@ fun EditPhotoScreen(
             )
         }
 
-        // ── Tab bottoni tool ─────────────────────────────────────────────────
+        // Tab tool
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -179,53 +200,46 @@ fun EditPhotoScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ToolTabButton(
-                label         = "Crop",
-                icon          = { Icon(Icons.Filled.Crop, null, modifier = Modifier.size(18.dp)) },
-                selected      = activeTool == EditTool.CROP,
-                activeColor   = lavLight,
-                inactiveColor = lavLightTrasl,
-                textColor     = black
+                label = "Crop",
+                icon  = { Icon(Icons.Filled.Crop, null, modifier = Modifier.size(18.dp)) },
+                selected = activeTool == EditTool.CROP,
+                activeColor = lavLight, inactiveColor = lavLightTrasl, textColor = black
             ) { activeTool = EditTool.CROP }
 
             ToolTabButton(
-                label         = "Rotate",
-                icon          = { Icon(Icons.Filled.RotateRight, null, modifier = Modifier.size(18.dp)) },
-                selected      = activeTool == EditTool.ROTATE,
-                activeColor   = lavLight,
-                inactiveColor = lavLightTrasl,
-                textColor     = black
+                label = "Rotate",
+                icon  = { Icon(Icons.AutoMirrored.Filled.RotateRight, null, modifier = Modifier.size(18.dp)) },
+                selected = activeTool == EditTool.ROTATE,
+                activeColor = lavLight, inactiveColor = lavLightTrasl, textColor = black
             ) { activeTool = EditTool.ROTATE }
 
             ToolTabButton(
-                label         = "Mirror",
-                icon          = { Icon(Icons.Filled.Flip, null, modifier = Modifier.size(18.dp)) },
-                selected      = activeTool == EditTool.MIRROR,
-                activeColor   = lavLight,
-                inactiveColor = lavLightTrasl,
-                textColor     = black
+                label = "Mirror",
+                icon  = { Icon(Icons.Filled.Flip, null, modifier = Modifier.size(18.dp)) },
+                selected = activeTool == EditTool.MIRROR,
+                activeColor = lavLight, inactiveColor = lavLightTrasl, textColor = black
             ) { activeTool = EditTool.MIRROR }
         }
 
-        // ── Apply button ─────────────────────────────────────────────────────
+        // Apply
         Button(
-            onClick = { onApply(applyAllEdits(originalBitmap, editState)) },
+            onClick = {
+                onApply(applyAllEdits(accumulatedBitmap, editState))
+            },
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .padding(bottom = 24.dp)
                 .width(160.dp)
                 .height(48.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = grey,
-                contentColor   = black
-            ),
-            shape = RoundedCornerShape(24.dp)
+            colors = ButtonDefaults.buttonColors(containerColor = grey, contentColor = black),
+            shape  = RoundedCornerShape(24.dp)
         ) {
             Text("Apply", fontSize = 20.sp, fontFamily = robotoRegular)
         }
     }
 }
 
-// ─── Tab button helper ────────────────────────────────────────────────────────
+// ─── Tab button ───────────────────────────────────────────────────────────────
 @Composable
 private fun RowScope.ToolTabButton(
     label: String,
@@ -238,14 +252,12 @@ private fun RowScope.ToolTabButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = Modifier
-            .weight(1f)
-            .height(44.dp),
-        colors = ButtonDefaults.buttonColors(
+        modifier = Modifier.weight(1f).height(44.dp),
+        colors   = ButtonDefaults.buttonColors(
             containerColor = if (selected) activeColor else inactiveColor,
             contentColor   = textColor
         ),
-        shape = RoundedCornerShape(12.dp),
+        shape          = RoundedCornerShape(12.dp),
         contentPadding = PaddingValues(horizontal = 8.dp)
     ) {
         icon()
@@ -256,6 +268,10 @@ private fun RowScope.ToolTabButton(
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CROP TOOL
+// Fix: awaitEachGesture + awaitFirstDown + drag() al posto del loop manuale
+// con awaitPointerEventScope + PointerEventPass.Initial che causava il blocco.
+// drag(pointerId) traccia esattamente quel dito fino al rilascio e fornisce
+// positionChange() già calcolato, eliminando il prevPos manuale.
 // ═══════════════════════════════════════════════════════════════════════════════
 @Composable
 private fun CropTool(
@@ -264,22 +280,21 @@ private fun CropTool(
     onCropChanged: (Rect) -> Unit,
     onReset: () -> Unit
 ) {
-    var imageSize      by remember { mutableStateOf(IntSize.Zero) }
-    var cropPx         by remember { mutableStateOf<Rect?>(null) }
-    var draggingHandle by remember { mutableStateOf<String?>(null) }
-    val handleRadius   = 24f
+    var boxSize      by remember { mutableStateOf(IntSize.Zero) }
+    val cropPx        = remember { mutableStateOf<Rect?>(null) }
+    var activeHandle by remember { mutableStateOf<String?>(null) }
+    val handlePx     = 40f   // raggio touch handle in px
 
-    LaunchedEffect(imageSize) {
-        if (imageSize != IntSize.Zero) {
-            val w = imageSize.width.toFloat()
-            val h = imageSize.height.toFloat()
-            cropPx = Rect(
-                left   = editState.cropRect.left   * w,
-                top    = editState.cropRect.top    * h,
-                right  = editState.cropRect.right  * w,
-                bottom = editState.cropRect.bottom * h
-            )
-        }
+    // Inizializza cropPx quando boxSize è disponibile e cropPx è null
+    if (cropPx.value == null && boxSize != IntSize.Zero) {
+        val w = boxSize.width.toFloat()
+        val h = boxSize.height.toFloat()
+        cropPx.value = Rect(
+            left   = editState.cropRect.left   * w,
+            top    = editState.cropRect.top    * h,
+            right  = editState.cropRect.right  * w,
+            bottom = editState.cropRect.bottom * h
+        )
     }
 
     Column(
@@ -290,98 +305,145 @@ private fun CropTool(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .onGloballyPositioned { coords -> imageSize = coords.size }
-                .pointerInput(imageSize) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            val rect = cropPx ?: return@detectDragGestures
-                            draggingHandle = hitTestHandle(offset, rect, handleRadius)
-                                ?: if (rect.contains(offset)) "body" else null
-                        },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val currentRect = cropPx ?: return@detectDragGestures
-                            val w           = imageSize.width.toFloat()
-                            val h           = imageSize.height.toFloat()
-                            val dx          = dragAmount.x
-                            val dy          = dragAmount.y
-                            val minSize     = 60f
+                // Ricalcola cropPx solo se le dimensioni cambiano davvero
+                .onSizeChanged { newSize ->
+                    if (newSize != boxSize) {
+                        boxSize = newSize
+                        cropPx.value = Rect(
+                            left   = editState.cropRect.left   * newSize.width,
+                            top    = editState.cropRect.top    * newSize.height,
+                            right  = editState.cropRect.right  * newSize.width,
+                            bottom = editState.cropRect.bottom * newSize.height
+                        )
+                    }
+                }
+                // ── FIX PRINCIPALE ────────────────────────────────────────────
+                // awaitEachGesture crea una coroutine fresca per ogni gesto,
+                // evitando loop annidati che perdevano/duplicavano gli eventi.
+                // drag(pointerId) traccia esattamente il dito che ha fatto down
+                // e fornisce positionChange() → niente più prevPos manuale.
+                // ─────────────────────────────────────────────────────────────
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        // Aspetta il touch-down
+                        val down = awaitFirstDown(requireUnconsumed = false)
 
-                            val newRect: Rect = when (draggingHandle) {
+                        val rect = cropPx.value ?: return@awaitEachGesture
+
+                        // Determina quale handle (o body) è stato toccato
+                        activeHandle = hitTestHandle(down.position, rect, handlePx)
+                            ?: if (rect.contains(down.position)) "body" else null
+
+                        // Se il dito è fuori dal rect e fuori dagli handle → ignora
+                        if (activeHandle == null) return@awaitEachGesture
+                        down.consume()
+
+                        // Segui il dito finché non viene sollevato
+                        drag(pointerId = down.id) { change ->
+                            change.consume()
+
+                            val delta   = change.position - change.previousPosition
+                            val dx      = delta.x
+                            val dy      = delta.y
+                            val cur     = cropPx.value ?: return@drag
+                            val w       = boxSize.width.toFloat()
+                            val h       = boxSize.height.toFloat()
+                            val minSize = 80f
+
+                            val updated: Rect = when (activeHandle) {
                                 "tl" -> Rect(
-                                    left   = (currentRect.left + dx).coerceIn(0f, currentRect.right - minSize),
-                                    top    = (currentRect.top  + dy).coerceIn(0f, currentRect.bottom - minSize),
-                                    right  = currentRect.right,
-                                    bottom = currentRect.bottom
+                                    (cur.left + dx).coerceIn(0f, cur.right  - minSize),
+                                    (cur.top  + dy).coerceIn(0f, cur.bottom - minSize),
+                                    cur.right, cur.bottom
                                 )
                                 "tr" -> Rect(
-                                    left   = currentRect.left,
-                                    top    = (currentRect.top  + dy).coerceIn(0f, currentRect.bottom - minSize),
-                                    right  = (currentRect.right + dx).coerceIn(currentRect.left + minSize, w),
-                                    bottom = currentRect.bottom
+                                    cur.left,
+                                    (cur.top  + dy).coerceIn(0f, cur.bottom - minSize),
+                                    (cur.right + dx).coerceIn(cur.left + minSize, w),
+                                    cur.bottom
                                 )
                                 "bl" -> Rect(
-                                    left   = (currentRect.left + dx).coerceIn(0f, currentRect.right - minSize),
-                                    top    = currentRect.top,
-                                    right  = currentRect.right,
-                                    bottom = (currentRect.bottom + dy).coerceIn(currentRect.top + minSize, h)
+                                    (cur.left + dx).coerceIn(0f, cur.right - minSize),
+                                    cur.top,
+                                    cur.right,
+                                    (cur.bottom + dy).coerceIn(cur.top + minSize, h)
                                 )
                                 "br" -> Rect(
-                                    left   = currentRect.left,
-                                    top    = currentRect.top,
-                                    right  = (currentRect.right  + dx).coerceIn(currentRect.left + minSize, w),
-                                    bottom = (currentRect.bottom + dy).coerceIn(currentRect.top + minSize, h)
+                                    cur.left, cur.top,
+                                    (cur.right  + dx).coerceIn(cur.left + minSize, w),
+                                    (cur.bottom + dy).coerceIn(cur.top  + minSize, h)
                                 )
                                 "body" -> {
-                                    val newL = (currentRect.left + dx).coerceIn(0f, w - currentRect.width)
-                                    val newT = (currentRect.top  + dy).coerceIn(0f, h - currentRect.height)
-                                    Rect(newL, newT, newL + currentRect.width, newT + currentRect.height)
+                                    val l = (cur.left + dx).coerceIn(0f, w - cur.width)
+                                    val t = (cur.top  + dy).coerceIn(0f, h - cur.height)
+                                    Rect(l, t, l + cur.width, t + cur.height)
                                 }
-                                else -> currentRect
+                                else -> cur
                             }
-                            cropPx = newRect
+
+                            cropPx.value = updated
                             onCropChanged(
                                 Rect(
-                                    left   = newRect.left   / w,
-                                    top    = newRect.top    / h,
-                                    right  = newRect.right  / w,
-                                    bottom = newRect.bottom / h
+                                    updated.left   / w,
+                                    updated.top    / h,
+                                    updated.right  / w,
+                                    updated.bottom / h
                                 )
                             )
-                        },
-                        onDragEnd = { draggingHandle = null }
-                    )
+                        }
+
+                        // Pulizia al rilascio del dito
+                        activeHandle = null
+                    }
                 }
         ) {
+            // Immagine
             if (bitmap != null) {
                 androidx.compose.foundation.Image(
-                    bitmap = bitmap.asImageBitmap(),
+                    bitmap             = bitmap.asImageBitmap(),
                     contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize()
+                    contentScale       = ContentScale.Fit,
+                    modifier           = Modifier.fillMaxSize()
                 )
             }
 
+            // Overlay crop — Canvas figlio, NON intercetta eventi
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val rect = cropPx ?: Rect(0f, 0f, size.width, size.height)
+                val rect = cropPx.value ?: Rect(0f, 0f, size.width, size.height)
 
-                val diff = Path().apply {
-                    op(
-                        Path().apply { addRect(Rect(0f, 0f, size.width, size.height)) },
-                        Path().apply { addRect(rect) },
-                        PathOperation.Difference
-                    )
-                }
-                drawPath(diff, Color.Black.copy(alpha = 0.4f))
+                // Scurisci esterno
+                drawPath(
+                    path = Path().apply {
+                        op(
+                            Path().apply { addRect(Rect(0f, 0f, size.width, size.height)) },
+                            Path().apply { addRect(rect) },
+                            PathOperation.Difference
+                        )
+                    },
+                    color = Color.Black.copy(alpha = 0.45f)
+                )
 
+                // Bordo bianco
                 drawRect(
-                    color   = Color(0xFF2196F3),
+                    color   = Color.White,
                     topLeft = Offset(rect.left, rect.top),
                     size    = Size(rect.width, rect.height),
                     style   = Stroke(width = 2.dp.toPx())
                 )
 
-                drawCropHandles(rect, handleRadius * 0.55f)
+                // Griglia 3×3
+                val tw = rect.width  / 3f
+                val th = rect.height / 3f
+                for (i in 1..2) {
+                    drawLine(Color.White.copy(alpha = 0.4f),
+                        Offset(rect.left + tw * i, rect.top),
+                        Offset(rect.left + tw * i, rect.bottom), 1.dp.toPx())
+                    drawLine(Color.White.copy(alpha = 0.4f),
+                        Offset(rect.left,  rect.top + th * i),
+                        Offset(rect.right, rect.top + th * i), 1.dp.toPx())
+                }
+
+                drawCropHandles(rect, handlePx * 0.55f)
             }
         }
 
@@ -390,7 +452,12 @@ private fun CropTool(
                 .fillMaxWidth()
                 .padding(end = 16.dp, top = 4.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.End
-        ) { ResetButton(onReset) }
+        ) {
+            ResetButton {
+                onReset()
+                cropPx.value = null   // forza ricalcolo nel prossimo frame
+            }
+        }
     }
 }
 
@@ -401,7 +468,11 @@ private fun DrawScope.drawCropHandles(rect: Rect, r: Float) {
         Offset(rect.left,  rect.bottom),
         Offset(rect.right, rect.bottom)
     ).forEach { c ->
-        drawRect(Color.Black, topLeft = Offset(c.x - r, c.y - r), size = Size(r * 2, r * 2))
+        drawRect(Color.White,
+            topLeft = Offset(c.x - r, c.y - r), size = Size(r * 2f, r * 2f))
+        drawRect(Color(0xFF1E88E5),
+            topLeft = Offset(c.x - r, c.y - r), size = Size(r * 2f, r * 2f),
+            style = Stroke(width = 2.5.dp.toPx()))
     }
 }
 
@@ -411,7 +482,10 @@ private fun hitTestHandle(offset: Offset, rect: Rect, radius: Float): String? =
         "tr" to Offset(rect.right, rect.top),
         "bl" to Offset(rect.left,  rect.bottom),
         "br" to Offset(rect.right, rect.bottom)
-    ).entries.firstOrNull { (_, c) -> (offset - c).getDistance() <= radius }?.key
+    ).entries.firstOrNull { (_, c) ->
+        offset.x in (c.x - radius)..(c.x + radius) &&
+                offset.y in (c.y - radius)..(c.y + radius)
+    }?.key
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROTATE TOOL
@@ -430,9 +504,7 @@ private fun RotateTool(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             contentAlignment = Alignment.Center
         ) {
             if (bitmap != null) {
@@ -446,33 +518,25 @@ private fun RotateTool(
                 )
             }
         }
-
         Text(
-            text = "Angle ${editState.angleDeg.toInt()}°",
-            fontSize = 14.sp,
-            fontFamily = robotoRegular,
+            "Angle ${editState.angleDeg.toInt()}°",
+            fontSize = 14.sp, fontFamily = robotoRegular,
             color = Color.Black.copy(alpha = 0.6f),
             modifier = Modifier.padding(top = 8.dp)
         )
-
         Slider(
             value = editState.angleDeg,
-            onValueChange = { onAngleChanged(it) },
+            onValueChange = onAngleChanged,
             valueRange = -180f..180f,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             colors = SliderDefaults.colors(
-                thumbColor         = lavLight,
-                activeTrackColor   = lavLight,
+                thumbColor = lavLight,
+                activeTrackColor = lavLight,
                 inactiveTrackColor = lavLightTrasl
             )
         )
-
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 16.dp, bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(end = 16.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.End
         ) { ResetButton(onReset) }
     }
@@ -496,9 +560,7 @@ private fun MirrorTool(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             contentAlignment = Alignment.Center
         ) {
             if (bitmap != null) {
@@ -515,16 +577,13 @@ private fun MirrorTool(
                 )
             }
         }
-
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
         ) {
             Button(
                 onClick = onFlipV,
-                colors = ButtonDefaults.buttonColors(
+                colors  = ButtonDefaults.buttonColors(
                     containerColor = if (editState.flipVertical) lavLight else lavLightTrasl,
                     contentColor   = Color.Black
                 ),
@@ -534,83 +593,75 @@ private fun MirrorTool(
                 Spacer(Modifier.width(4.dp))
                 Text("Flip vertical", fontFamily = robotoRegular, fontSize = 14.sp)
             }
-
             Button(
                 onClick = onFlipH,
-                colors = ButtonDefaults.buttonColors(
+                colors  = ButtonDefaults.buttonColors(
                     containerColor = if (editState.flipHorizontal) lavLight else lavLightTrasl,
                     contentColor   = Color.Black
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(
-                    Icons.Filled.Flip, null,
-                    modifier = Modifier
-                        .size(18.dp)
-                        .graphicsLayer { rotationZ = 90f }
-                )
+                Icon(Icons.Filled.Flip, null,
+                    modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f })
                 Spacer(Modifier.width(4.dp))
                 Text("Flip horizontal", fontFamily = robotoRegular, fontSize = 14.sp)
             }
         }
-
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(end = 16.dp, bottom = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(end = 16.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.End
         ) { ResetButton(onReset) }
     }
 }
 
-// ─── Reset button condiviso ───────────────────────────────────────────────────
+// ─── Reset button ─────────────────────────────────────────────────────────────
 @Composable
 private fun ResetButton(onReset: () -> Unit) {
     OutlinedButton(
         onClick = onReset,
-        shape = RoundedCornerShape(20.dp),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
+        shape   = RoundedCornerShape(20.dp),
+        colors  = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black)
     ) {
-        Icon(
-            painter = painterResource(id = R.drawable.ic_reset),
-            contentDescription = null,
-            modifier = Modifier.size(16.dp)
-        )
+        Icon(painterResource(id = R.drawable.ic_reset), null, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(4.dp))
         Text("Reset", fontFamily = robotoRegular, fontSize = 14.sp)
     }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// APPLY — produce Bitmap finale con crop → rotate → flip
+// BITMAP PROCESSING
 // ═══════════════════════════════════════════════════════════════════════════════
-fun applyAllEdits(original: Bitmap?, state: EditState): Bitmap? {
+internal fun applyEdits(
+    original: Bitmap?,
+    cropRect: Rect,
+    angleDeg: Float,
+    flipH: Boolean,
+    flipV: Boolean
+): Bitmap? {
     original ?: return null
     var bmp = original.copy(Bitmap.Config.ARGB_8888, true)
 
-    val cr = state.cropRect
-    if (cr != Rect(0f, 0f, 1f, 1f)) {
-        val x = (cr.left   * bmp.width).toInt().coerceIn(0, bmp.width - 1)
-        val y = (cr.top    * bmp.height).toInt().coerceIn(0, bmp.height - 1)
-        val w = ((cr.right  - cr.left) * bmp.width).toInt()
-            .coerceAtLeast(1).coerceAtMost(bmp.width - x)
-        val h = ((cr.bottom - cr.top)  * bmp.height).toInt()
+    if (cropRect != Rect(0f, 0f, 1f, 1f)) {
+        val x = (cropRect.left   * bmp.width ).toInt().coerceIn(0, bmp.width  - 1)
+        val y = (cropRect.top    * bmp.height).toInt().coerceIn(0, bmp.height - 1)
+        val w = ((cropRect.right  - cropRect.left) * bmp.width ).toInt()
+            .coerceAtLeast(1).coerceAtMost(bmp.width  - x)
+        val h = ((cropRect.bottom - cropRect.top ) * bmp.height).toInt()
             .coerceAtLeast(1).coerceAtMost(bmp.height - y)
         bmp = Bitmap.createBitmap(bmp, x, y, w, h)
     }
 
-    if (state.angleDeg != 0f) {
-        val m = Matrix().apply { postRotate(state.angleDeg) }
+    if (angleDeg != 0f) {
+        val m = Matrix().apply { postRotate(angleDeg) }
         bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
     }
 
-    if (state.flipHorizontal || state.flipVertical) {
+    if (flipH || flipV) {
         val m = Matrix().apply {
             postScale(
-                if (state.flipHorizontal) -1f else 1f,
-                if (state.flipVertical)   -1f else 1f,
-                bmp.width / 2f,
-                bmp.height / 2f
+                if (flipH) -1f else 1f,
+                if (flipV) -1f else 1f,
+                bmp.width / 2f, bmp.height / 2f
             )
         }
         bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
@@ -619,9 +670,9 @@ fun applyAllEdits(original: Bitmap?, state: EditState): Bitmap? {
     return bmp
 }
 
-// ─── Utility: carica Bitmap da URI ───────────────────────────────────────────
-fun loadBitmapFromUri(context: android.content.Context, uri: Uri): Bitmap? = try {
-    context.contentResolver.openInputStream(uri)?.use { stream ->
-        android.graphics.BitmapFactory.decodeStream(stream)
-    }
+fun applyAllEdits(original: Bitmap?, state: EditState): Bitmap? =
+    applyEdits(original, state.cropRect, state.angleDeg, state.flipHorizontal, state.flipVertical)
+
+fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? = try {
+    context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
 } catch (e: Exception) { null }

@@ -6,7 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.lk.langermap.screens.HomeScreen
 import com.lk.langermap.screens.SexScreen
-import com.lk.langermap.screens.nav
+import com.lk.langermap.screens.Navigation
 import com.lk.langermap.ui.theme.LangerMapTheme
 
 class MainActivity : ComponentActivity() {
@@ -16,7 +16,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             LangerMapTheme {
                 SexScreen()
-                nav()
+                Navigation()
 
             }
         }
