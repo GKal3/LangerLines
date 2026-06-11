@@ -32,19 +32,22 @@ import java.net.URLEncoder
 @Composable
 fun UploadScreen(
     regionDrawableResId: Int = 0,
-    regionName: String = "Forehead",
+    regionName: String? = null,
+    initialImageUri: Uri? = null,
+    onImageSelected: (Uri?) -> Unit = {},
     onNavigateToCamera: () -> Unit = {},
     onNavigateToSettings: (String) -> Unit = {},
     onNavigateToOverlay: (String) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedImageUri by remember { mutableStateOf(initialImageUri) }
 
     // launcher per scegliere file dalla galleria
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         selectedImageUri = uri
+        onImageSelected(uri)
     }
 
     Column(
@@ -259,7 +262,10 @@ fun UploadScreen(
                 )
             }
             Button(
-                onClick = { selectedImageUri = null },
+                onClick = {
+                    selectedImageUri = null
+                    onImageSelected(null)
+                          },
                 modifier = Modifier
                     .weight(1f)
                     .height(56.dp),

@@ -31,7 +31,10 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.lk.langermap.R
 import com.lk.langermap.ui.theme.*
-import java.io.OutputStream
+import java.io.File
+import androidx.core.content.FileProvider
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 
 @Preview
 @Composable
@@ -49,9 +52,11 @@ fun OutputScreen(
             .fillMaxSize()
             .background(Color.White)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
+            .padding(horizontal = 16.dp)
+        // ✅ FIX: blocca i touch events dal passare alla schermata sottostante
+        .pointerInput(Unit) { detectTapGestures { } },
+    horizontalAlignment = Alignment.CenterHorizontally
+) { 
 
         // Top bar
         Row(
@@ -249,12 +254,56 @@ private fun saveToGallery(context: Context, photoUri: String, format: String) {
     }
 }
 
+// ── SHARE IMAGE ───────────────────────────────────────────────────────────────
+//
+// FIX 1 — FileProvider invece di Uri.fromFile / file://
+//   I file in cache (file://) non sono leggibili dalle altre app per motivi di
+//   sicurezza (FileUriExposedException su API 24+). FileProvider genera un URI
+//   content:// con permesso di lettura temporaneo riconosciuto dal sistema.
+//
+// FIX 2 — FLAG_ACTIVITY_NEW_TASK
+//   startActivity() chiamato da un Context non-Activity richiede questo flag,
+//   altrimenti il sistema lancia un'eccezione silenziosa e il chooser non appare.
+//
+// FIX 3 — chooser creato con Intent.createChooser + FLAG_ACTIVITY_NEW_TASK
+//   Il chooser stesso è un'Activity separata; deve ereditare il flag.
+//
 private fun shareImage(context: Context, photoUri: String) {
-    val uri = Uri.parse(photoUri)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/*"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    try {
+        val originalUri = Uri.parse(photoUri)
+
+        // Converti file:// → content:// tramite FileProvider
+        // (se è già un content:// lo usiamo direttamente)
+        val shareUri: Uri = if (originalUri.scheme == "file") {
+            val file = File(originalUri.path ?: return)
+            FileProvider.getUriForFile(
+                context,
+                // Deve corrispondere all'authority dichiarata nel Manifest:
+                // <provider android:authorities="${applicationId}.provider" .../>
+                "${context.packageName}.provider",
+                file
+            )
+        } else {
+            // content:// già compatibile
+            originalUri
+        }
+
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "image/*"
+            putExtra(Intent.EXTRA_STREAM, shareUri)
+            // Permesso di lettura esplicito per le app che ricevono l'intent
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            // Necessario quando startActivity() viene chiamato fuori da un'Activity
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        val chooser = Intent.createChooser(shareIntent, "Share image").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        context.startActivity(chooser)
+
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
-    context.startActivity(Intent.createChooser(intent, "Share image"))
 }

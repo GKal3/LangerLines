@@ -19,15 +19,35 @@ import androidx.compose.ui.unit.sp
 import com.lk.langermap.R
 import com.lk.langermap.ui.theme.*
 import androidx.compose.material3.ExperimentalMaterial3Api
-import com.lk.langermap.screens.RegionScreen
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.Lifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
 @Composable
-fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
-
+fun SexScreen(
+    initialSex: String? = null,
+    onNavigateToRegion: (String) -> Unit = {}
+) {
+    var selectedSex by remember { mutableStateOf(initialSex) }
     var expanded by remember { mutableStateOf(false) }
-    var selectedSex by remember { mutableStateOf<String?>(null) }
+    //var selectedSex by remember { mutableStateOf<String?>(null) }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP) {
+                expanded = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            expanded = false
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
     val options = listOf("Male", "Female")
 
     Box(
@@ -37,7 +57,7 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
             .statusBarsPadding()
     ) {
 
-        // ── Gradient background (top half) ──────────────────────────────────
+        // Gradient background
         Image(
             painter = painterResource(id = R.drawable.gradient1),
             contentDescription = null,
@@ -48,29 +68,29 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                 .align(Alignment.TopCenter)
         )
 
-        // ── Header (logo + titolo) ───────────────────────────────────────────
+        // Header
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.35f)          // altezza header fissa al 35 %
+                .fillMaxHeight(0.35f)
                 .align(Alignment.TopCenter)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(id = R.drawable.logo_lm),
                     contentDescription = null,
-                    modifier = Modifier.size(width = 59.dp, height = 79.dp)
+                    modifier = Modifier.size(width = 49.dp, height = 69.dp)
                 )
                 Text(
                     text = stringResource(id = R.string.app_name),
-                    fontSize = 14.sp,
+                    fontSize = 10.sp,
                     fontFamily = montserratSemiBold
                 )
             }
 
             Text(
                 text = stringResource(id = R.string.choose_sex),
-                fontSize = 36.sp,
+                fontSize = 28.sp,
                 fontFamily = robotoSemiBold,
                 color = colorResource(id = R.color.b),
                 modifier = Modifier
@@ -79,7 +99,7 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
             )
         }
 
-        // ── Card bianca (bottom sheet statico) ──────────────────────────────
+        // Card bianca
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -109,21 +129,22 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                     )
             )
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(137.dp))
 
             // Dropdown
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(0.7f)
             ) {
                 OutlinedTextField(
                     value = selectedSex ?: "Select gender",
                     onValueChange = {},
                     readOnly = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(  // ← font sul testo selezionato
+                    textStyle = androidx.compose.ui.text.TextStyle(
                         fontFamily = robotoRegular,
-                        fontSize = 24.sp
+                        fontSize = 20.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     ),
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
@@ -136,7 +157,7 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                     ),
                     shape = RoundedCornerShape(16.dp),
                     modifier = Modifier
-                        .menuAnchor()
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                         .fillMaxWidth()
                 )
 
@@ -144,13 +165,15 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                     expanded = expanded,
                     onDismissRequest = { expanded = false }
                 ) {
-                    options.forEach { option ->
+                    options.forEachIndexed { index, option ->
                         DropdownMenuItem(
                             text = {
                                 Text(
                                     text = option,
                                     fontFamily = robotoRegular,
-                                    fontSize = 24.sp   // ← aggiunto
+                                    fontSize = 20.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             },
                             onClick = {
@@ -158,6 +181,12 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
                                 expanded = false
                             }
                         )
+                        if (index < options.size - 1) {
+                            HorizontalDivider(
+                                color = colorResource(id = R.color.l_grey_trasl),
+                                thickness = 2.dp
+                            )
+                        }
                     }
                 }
             }
@@ -176,7 +205,7 @@ fun SexScreen(onNavigateToRegion: (String) -> Unit = {}) {
             ) {
                 Text(
                     text = stringResource(id = R.string.btn_next),
-                    fontSize = 24.sp,
+                    fontSize = 20.sp,
                     fontFamily = robotoRegular
                 )
             }

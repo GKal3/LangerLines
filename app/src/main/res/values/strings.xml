@@ -9,5 +9,6 @@
     <string name="arm">Arm</string>
     <string name="leg">Leg</string>
     <string name="chest">Chest</string>
+    <string name="back">Back</string>
     <string name="btn_next">Next</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.lk.langermap.screens
 
+
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -43,10 +44,14 @@ import com.lk.langermap.ui.theme.robotoSemiBold
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// ─── Tool enum ────────────────────────────────────────────────────────────────
-enum class EditTool { CROP, ROTATE, MIRROR }
 
-// ─── Stato globale accumulato tra i tool ──────────────────────────────────────
+private const val MAX_PREVIEW_PX = 1280
+
+
+// ── Solo due tool ora ─────────────────────────────────────────────────────────
+enum class EditTool { CROP_ROTATE, MIRROR }
+
+
 data class EditState(
     val cropRect: Rect = Rect(0f, 0f, 1f, 1f),
     val angleDeg: Float = 0f,
@@ -54,7 +59,7 @@ data class EditState(
     val flipHorizontal: Boolean = false
 )
 
-// ─── Screen principale ────────────────────────────────────────────────────────
+
 @Preview(showBackground = true)
 @Composable
 fun EditPhotoScreen(
@@ -64,34 +69,17 @@ fun EditPhotoScreen(
 ) {
     val context = LocalContext.current
 
-    var editState      by remember { mutableStateOf(EditState()) }
-    var activeTool     by remember { mutableStateOf(EditTool.CROP) }
-    var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var editState  by remember { mutableStateOf(EditState()) }
+    var activeTool by remember { mutableStateOf(EditTool.CROP_ROTATE) }
 
-    // Carica bitmap originale
+    var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var previewBitmap  by remember { mutableStateOf<Bitmap?>(null) }
+
     LaunchedEffect(photoUri) {
         if (photoUri != Uri.EMPTY) {
-            withContext(Dispatchers.IO) {
-                originalBitmap = loadBitmapFromUri(context, photoUri)
-            }
-        }
-    }
-
-    // Bitmap che accumula le modifiche confermate
-    var accumulatedBitmap by remember { mutableStateOf<Bitmap?>(null) }
-
-    LaunchedEffect(originalBitmap) {
-        if (originalBitmap != null && accumulatedBitmap == null) {
-            accumulatedBitmap = originalBitmap
-        }
-    }
-
-    // 2. Quando cambi tool, applica le modifiche correnti all'accumulato
-    LaunchedEffect(activeTool) {
-        val src = accumulatedBitmap ?: return@LaunchedEffect
-        withContext(Dispatchers.IO) {
-            accumulatedBitmap = applyAllEdits(src, editState)
-            editState = EditState() // resetta lo stato per il nuovo tool
+            val full = withContext(Dispatchers.IO) { loadBitmapFromUri(context, photoUri) }
+            originalBitmap = full
+            previewBitmap  = withContext(Dispatchers.IO) { scaledForPreview(full) }
         }
     }
 
@@ -107,7 +95,7 @@ fun EditPhotoScreen(
             .background(white)
             .statusBarsPadding()
     ) {
-        // Top bar
+        // ── Top bar ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -137,7 +125,7 @@ fun EditPhotoScreen(
             modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 8.dp)
         )
 
-        // Area tool
+        // ── Area tool ─────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -146,22 +134,20 @@ fun EditPhotoScreen(
             contentAlignment = Alignment.Center
         ) {
             when (activeTool) {
-                EditTool.CROP -> CropTool(
-                    bitmap        = accumulatedBitmap,
-                    editState     = editState,
-                    onCropChanged = { editState = editState.copy(cropRect = it) },
-                    onReset       = { editState = editState.copy(cropRect = Rect(0f, 0f, 1f, 1f)) }
-                )
-                EditTool.ROTATE -> RotateTool(
-                    bitmap         = accumulatedBitmap,
+                EditTool.CROP_ROTATE -> CropRotateTool(
+                    bitmap         = previewBitmap,
                     editState      = editState,
+                    onCropChanged  = { editState = editState.copy(cropRect = it) },
                     onAngleChanged = { editState = editState.copy(angleDeg = it) },
-                    onReset        = { editState = editState.copy(angleDeg = 0f) },
+                    onReset        = { editState = editState.copy(
+                        cropRect = Rect(0f, 0f, 1f, 1f),
+                        angleDeg = 0f
+                    )},
                     lavLight       = lavLight,
                     lavLightTrasl  = lavLightTrasl
                 )
                 EditTool.MIRROR -> MirrorTool(
-                    bitmap        = accumulatedBitmap,
+                    bitmap        = cropPreviewBitmap(previewBitmap, editState.cropRect),
                     editState     = editState,
                     onFlipV       = { editState = editState.copy(flipVertical   = !editState.flipVertical) },
                     onFlipH       = { editState = editState.copy(flipHorizontal = !editState.flipHorizontal) },
@@ -172,7 +158,7 @@ fun EditPhotoScreen(
             }
         }
 
-        // Divider "Edit tools"
+        // ── Divider "Edit tools" ───────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -192,7 +178,7 @@ fun EditPhotoScreen(
             )
         }
 
-        // Tab tool
+        // ── Tab tool ──────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -200,44 +186,88 @@ fun EditPhotoScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ToolTabButton(
-                label = "Crop",
-                icon  = { Icon(Icons.Filled.Crop, null, modifier = Modifier.size(18.dp)) },
-                selected = activeTool == EditTool.CROP,
-                activeColor = lavLight, inactiveColor = lavLightTrasl, textColor = black
-            ) { activeTool = EditTool.CROP }
-
-            ToolTabButton(
-                label = "Rotate",
-                icon  = { Icon(Icons.AutoMirrored.Filled.RotateRight, null, modifier = Modifier.size(18.dp)) },
-                selected = activeTool == EditTool.ROTATE,
-                activeColor = lavLight, inactiveColor = lavLightTrasl, textColor = black
-            ) { activeTool = EditTool.ROTATE }
+                label = "Crop & Rotate",
+                icon  = {
+                    Row {
+                        Icon(Icons.Filled.Crop, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Icon(Icons.AutoMirrored.Filled.RotateRight, null, modifier = Modifier.size(18.dp))
+                    }
+                },
+                selected      = activeTool == EditTool.CROP_ROTATE,
+                activeColor   = lavLight,
+                inactiveColor = lavLightTrasl,
+                textColor     = black
+            ) { activeTool = EditTool.CROP_ROTATE }
 
             ToolTabButton(
                 label = "Mirror",
                 icon  = { Icon(Icons.Filled.Flip, null, modifier = Modifier.size(18.dp)) },
-                selected = activeTool == EditTool.MIRROR,
-                activeColor = lavLight, inactiveColor = lavLightTrasl, textColor = black
+                selected      = activeTool == EditTool.MIRROR,
+                activeColor   = lavLight,
+                inactiveColor = lavLightTrasl,
+                textColor     = black
             ) { activeTool = EditTool.MIRROR }
         }
 
-        // Apply
+        // ── Reset globale ─────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 0.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            OutlinedButton(
+                onClick = {
+                    editState  = EditState()
+                    activeTool = EditTool.CROP_ROTATE
+                },
+                shape  = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = black)
+            ) {
+                Icon(
+                    painterResource(id = R.drawable.ic_reset),
+                    null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Reset All", fontFamily = robotoRegular, fontSize = 14.sp)
+            }
+        }
+
+        // ── Apply ─────────────────────────────────────────────────
         Button(
             onClick = {
-                onApply(applyAllEdits(accumulatedBitmap, editState))
+                onApply(applyAllEdits(originalBitmap, editState))
             },
             modifier = Modifier
                 .align(Alignment.CenterHorizontally)
                 .padding(bottom = 24.dp)
                 .width(160.dp)
                 .height(48.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = grey, contentColor = black),
-            shape  = RoundedCornerShape(24.dp)
+            colors = ButtonDefaults.buttonColors(
+                containerColor = grey,
+                contentColor   = black
+            ),
+            shape = RoundedCornerShape(24.dp)
         ) {
             Text("Apply", fontSize = 20.sp, fontFamily = robotoRegular)
         }
     }
 }
+
+
+// ─── Riduce bitmap per preview ────────────────────────────────────────────────
+internal fun scaledForPreview(bitmap: Bitmap?): Bitmap? {
+    bitmap ?: return null
+    val maxSide = maxOf(bitmap.width, bitmap.height)
+    if (maxSide <= MAX_PREVIEW_PX) return bitmap
+    val scale = MAX_PREVIEW_PX.toFloat() / maxSide
+    val w = (bitmap.width  * scale).toInt().coerceAtLeast(1)
+    val h = (bitmap.height * scale).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(bitmap, w, h, true)
+}
+
 
 // ─── Tab button ───────────────────────────────────────────────────────────────
 @Composable
@@ -251,9 +281,9 @@ private fun RowScope.ToolTabButton(
     onClick: () -> Unit
 ) {
     Button(
-        onClick = onClick,
-        modifier = Modifier.weight(1f).height(44.dp),
-        colors   = ButtonDefaults.buttonColors(
+        onClick        = onClick,
+        modifier       = Modifier.weight(1f).height(44.dp),
+        colors         = ButtonDefaults.buttonColors(
             containerColor = if (selected) activeColor else inactiveColor,
             contentColor   = textColor
         ),
@@ -266,26 +296,30 @@ private fun RowScope.ToolTabButton(
     }
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// CROP TOOL
-// Fix: awaitEachGesture + awaitFirstDown + drag() al posto del loop manuale
-// con awaitPointerEventScope + PointerEventPass.Initial che causava il blocco.
-// drag(pointerId) traccia esattamente quel dito fino al rilascio e fornisce
-// positionChange() già calcolato, eliminando il prevPos manuale.
+// CROP + ROTATE TOOL  (tool unificato)
 // ═══════════════════════════════════════════════════════════════════════════════
+// Layout verticale:
+//   [immagine con overlay crop]
+//   [slider angolo]
+//   [label angolo + reset]
 @Composable
-private fun CropTool(
+private fun CropRotateTool(
     bitmap: Bitmap?,
     editState: EditState,
     onCropChanged: (Rect) -> Unit,
-    onReset: () -> Unit
+    onAngleChanged: (Float) -> Unit,
+    onReset: () -> Unit,
+    lavLight: Color,
+    lavLightTrasl: Color
 ) {
     var boxSize      by remember { mutableStateOf(IntSize.Zero) }
     val cropPx        = remember { mutableStateOf<Rect?>(null) }
     var activeHandle by remember { mutableStateOf<String?>(null) }
-    val handlePx     = 40f   // raggio touch handle in px
+    val handlePx     = 40f
 
-    // Inizializza cropPx quando boxSize è disponibile e cropPx è null
+    // Inizializza cropPx dalle coordinate normalizzate
     if (cropPx.value == null && boxSize != IntSize.Zero) {
         val w = boxSize.width.toFloat()
         val h = boxSize.height.toFloat()
@@ -301,11 +335,12 @@ private fun CropTool(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+
+        // ── Immagine + overlay crop ────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                // Ricalcola cropPx solo se le dimensioni cambiano davvero
                 .onSizeChanged { newSize ->
                     if (newSize != boxSize) {
                         boxSize = newSize
@@ -317,31 +352,19 @@ private fun CropTool(
                         )
                     }
                 }
-                // ── FIX PRINCIPALE ────────────────────────────────────────────
-                // awaitEachGesture crea una coroutine fresca per ogni gesto,
-                // evitando loop annidati che perdevano/duplicavano gli eventi.
-                // drag(pointerId) traccia esattamente il dito che ha fatto down
-                // e fornisce positionChange() → niente più prevPos manuale.
-                // ─────────────────────────────────────────────────────────────
                 .pointerInput(Unit) {
                     awaitEachGesture {
-                        // Aspetta il touch-down
                         val down = awaitFirstDown(requireUnconsumed = false)
-
                         val rect = cropPx.value ?: return@awaitEachGesture
 
-                        // Determina quale handle (o body) è stato toccato
                         activeHandle = hitTestHandle(down.position, rect, handlePx)
                             ?: if (rect.contains(down.position)) "body" else null
 
-                        // Se il dito è fuori dal rect e fuori dagli handle → ignora
                         if (activeHandle == null) return@awaitEachGesture
                         down.consume()
 
-                        // Segui il dito finché non viene sollevato
                         drag(pointerId = down.id) { change ->
                             change.consume()
-
                             val delta   = change.position - change.previousPosition
                             val dx      = delta.x
                             val dy      = delta.y
@@ -391,27 +414,29 @@ private fun CropTool(
                                 )
                             )
                         }
-
-                        // Pulizia al rilascio del dito
                         activeHandle = null
                     }
                 }
         ) {
-            // Immagine
             if (bitmap != null) {
                 androidx.compose.foundation.Image(
                     bitmap             = bitmap.asImageBitmap(),
                     contentDescription = null,
                     contentScale       = ContentScale.Fit,
-                    modifier           = Modifier.fillMaxSize()
+                    modifier           = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            rotationZ = editState.angleDeg
+                            scaleX    = if (editState.flipHorizontal) -1f else 1f
+                            scaleY    = if (editState.flipVertical)   -1f else 1f
+                        }
                 )
             }
 
-            // Overlay crop — Canvas figlio, NON intercetta eventi
+            // Overlay crop (disegnato sopra l'immagine ruotata)
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val rect = cropPx.value ?: Rect(0f, 0f, size.width, size.height)
 
-                // Scurisci esterno
                 drawPath(
                     path = Path().apply {
                         op(
@@ -422,16 +447,12 @@ private fun CropTool(
                     },
                     color = Color.Black.copy(alpha = 0.45f)
                 )
-
-                // Bordo bianco
                 drawRect(
                     color   = Color.White,
                     topLeft = Offset(rect.left, rect.top),
                     size    = Size(rect.width, rect.height),
                     style   = Stroke(width = 2.dp.toPx())
                 )
-
-                // Griglia 3×3
                 val tw = rect.width  / 3f
                 val th = rect.height / 3f
                 for (i in 1..2) {
@@ -442,11 +463,33 @@ private fun CropTool(
                         Offset(rect.left,  rect.top + th * i),
                         Offset(rect.right, rect.top + th * i), 1.dp.toPx())
                 }
-
                 drawCropHandles(rect, handlePx * 0.55f)
             }
         }
 
+        // ── Slider rotazione ──────────────────────────────────────
+        Text(
+            "Angle ${editState.angleDeg.toInt()}°",
+            fontSize = 14.sp,
+            fontFamily = robotoRegular,
+            color = Color.Black.copy(alpha = 0.6f),
+            modifier = Modifier.padding(top = 8.dp)
+        )
+        Slider(
+            value         = editState.angleDeg,
+            onValueChange = onAngleChanged,
+            valueRange    = -180f..180f,
+            modifier      = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            colors        = SliderDefaults.colors(
+                thumbColor         = lavLight,
+                activeTrackColor   = lavLight,
+                inactiveTrackColor = lavLightTrasl
+            )
+        )
+
+        // ── Reset locale ──────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -455,12 +498,94 @@ private fun CropTool(
         ) {
             ResetButton {
                 onReset()
-                cropPx.value = null   // forza ricalcolo nel prossimo frame
+                cropPx.value = null   // forza il re-init dell'overlay crop
             }
         }
     }
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MIRROR TOOL  (invariato)
+// ═══════════════════════════════════════════════════════════════════════════════
+@Composable
+private fun MirrorTool(
+    bitmap: Bitmap?,
+    editState: EditState,
+    onFlipV: () -> Unit,
+    onFlipH: () -> Unit,
+    onReset: () -> Unit,
+    lavLight: Color,
+    lavLightTrasl: Color
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().weight(1f),
+            contentAlignment = Alignment.Center
+        ) {
+            if (bitmap != null) {
+                androidx.compose.foundation.Image(
+                    bitmap             = bitmap.asImageBitmap(),
+                    contentDescription = null,
+                    contentScale       = ContentScale.Fit,
+                    modifier           = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            rotationZ = editState.angleDeg
+                            scaleX    = if (editState.flipHorizontal) -1f else 1f
+                            scaleY    = if (editState.flipVertical)   -1f else 1f
+                        }
+                )
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
+        ) {
+            Button(
+                onClick = onFlipV,
+                colors  = ButtonDefaults.buttonColors(
+                    containerColor = if (editState.flipVertical) lavLight else lavLightTrasl,
+                    contentColor   = Color.Black
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Filled.Flip, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("Flip vertical", fontFamily = robotoRegular, fontSize = 14.sp)
+            }
+            Button(
+                onClick = onFlipH,
+                colors  = ButtonDefaults.buttonColors(
+                    containerColor = if (editState.flipHorizontal) lavLight else lavLightTrasl,
+                    contentColor   = Color.Black
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Flip, null,
+                    modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f }
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Flip horizontal", fontFamily = robotoRegular, fontSize = 14.sp)
+            }
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(end = 16.dp, bottom = 4.dp),
+            horizontalArrangement = Arrangement.End
+        ) { ResetButton(onReset) }
+    }
+}
+
+
+// ─── Helpers invariati ────────────────────────────────────────────────────────
 private fun DrawScope.drawCropHandles(rect: Rect, r: Float) {
     listOf(
         Offset(rect.left,  rect.top),
@@ -487,134 +612,18 @@ private fun hitTestHandle(offset: Offset, rect: Rect, radius: Float): String? =
                 offset.y in (c.y - radius)..(c.y + radius)
     }?.key
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ROTATE TOOL
-// ═══════════════════════════════════════════════════════════════════════════════
-@Composable
-private fun RotateTool(
-    bitmap: Bitmap?,
-    editState: EditState,
-    onAngleChanged: (Float) -> Unit,
-    onReset: () -> Unit,
-    lavLight: Color,
-    lavLightTrasl: Color
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentAlignment = Alignment.Center
-        ) {
-            if (bitmap != null) {
-                androidx.compose.foundation.Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { rotationZ = editState.angleDeg }
-                )
-            }
-        }
-        Text(
-            "Angle ${editState.angleDeg.toInt()}°",
-            fontSize = 14.sp, fontFamily = robotoRegular,
-            color = Color.Black.copy(alpha = 0.6f),
-            modifier = Modifier.padding(top = 8.dp)
-        )
-        Slider(
-            value = editState.angleDeg,
-            onValueChange = onAngleChanged,
-            valueRange = -180f..180f,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-            colors = SliderDefaults.colors(
-                thumbColor = lavLight,
-                activeTrackColor = lavLight,
-                inactiveTrackColor = lavLightTrasl
-            )
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(end = 16.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.End
-        ) { ResetButton(onReset) }
-    }
+private fun cropPreviewBitmap(bitmap: Bitmap?, cropRect: Rect): Bitmap? {
+    bitmap ?: return null
+    if (cropRect == Rect(0f, 0f, 1f, 1f)) return bitmap
+    val x = (cropRect.left   * bitmap.width ).toInt().coerceIn(0, bitmap.width  - 1)
+    val y = (cropRect.top    * bitmap.height).toInt().coerceIn(0, bitmap.height - 1)
+    val w = ((cropRect.right  - cropRect.left) * bitmap.width ).toInt()
+        .coerceAtLeast(1).coerceAtMost(bitmap.width  - x)
+    val h = ((cropRect.bottom - cropRect.top ) * bitmap.height).toInt()
+        .coerceAtLeast(1).coerceAtMost(bitmap.height - y)
+    return Bitmap.createBitmap(bitmap, x, y, w, h)
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MIRROR TOOL
-// ═══════════════════════════════════════════════════════════════════════════════
-@Composable
-private fun MirrorTool(
-    bitmap: Bitmap?,
-    editState: EditState,
-    onFlipV: () -> Unit,
-    onFlipH: () -> Unit,
-    onReset: () -> Unit,
-    lavLight: Color,
-    lavLightTrasl: Color
-) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().weight(1f),
-            contentAlignment = Alignment.Center
-        ) {
-            if (bitmap != null) {
-                androidx.compose.foundation.Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = if (editState.flipHorizontal) -1f else 1f
-                            scaleY = if (editState.flipVertical)   -1f else 1f
-                        }
-                )
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)
-        ) {
-            Button(
-                onClick = onFlipV,
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = if (editState.flipVertical) lavLight else lavLightTrasl,
-                    contentColor   = Color.Black
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Filled.Flip, null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Flip vertical", fontFamily = robotoRegular, fontSize = 14.sp)
-            }
-            Button(
-                onClick = onFlipH,
-                colors  = ButtonDefaults.buttonColors(
-                    containerColor = if (editState.flipHorizontal) lavLight else lavLightTrasl,
-                    contentColor   = Color.Black
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Filled.Flip, null,
-                    modifier = Modifier.size(18.dp).graphicsLayer { rotationZ = 90f })
-                Spacer(Modifier.width(4.dp))
-                Text("Flip horizontal", fontFamily = robotoRegular, fontSize = 14.sp)
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(end = 16.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.End
-        ) { ResetButton(onReset) }
-    }
-}
-
-// ─── Reset button ─────────────────────────────────────────────────────────────
 @Composable
 private fun ResetButton(onReset: () -> Unit) {
     OutlinedButton(
@@ -628,9 +637,6 @@ private fun ResetButton(onReset: () -> Unit) {
     }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// BITMAP PROCESSING
-// ═══════════════════════════════════════════════════════════════════════════════
 internal fun applyEdits(
     original: Bitmap?,
     cropRect: Rect,
@@ -652,8 +658,24 @@ internal fun applyEdits(
     }
 
     if (angleDeg != 0f) {
-        val m = Matrix().apply { postRotate(angleDeg) }
-        bmp = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, m, true)
+        val srcW = bmp.width.toFloat()
+        val srcH = bmp.height.toFloat()
+        val rotMatrix = Matrix()
+        rotMatrix.setRotate(angleDeg, srcW / 2f, srcH / 2f)
+        val corners = floatArrayOf(0f, 0f, srcW, 0f, srcW, srcH, 0f, srcH)
+        rotMatrix.mapPoints(corners)
+        var minX = Float.MAX_VALUE;  var maxX = -Float.MAX_VALUE
+        var minY = Float.MAX_VALUE;  var maxY = -Float.MAX_VALUE
+        for (i in corners.indices step 2) {
+            minX = minOf(minX, corners[i]);   maxX = maxOf(maxX, corners[i])
+            minY = minOf(minY, corners[i+1]); maxY = maxOf(maxY, corners[i+1])
+        }
+        val newW = (maxX - minX).toInt().coerceAtLeast(1)
+        val newH = (maxY - minY).toInt().coerceAtLeast(1)
+        rotMatrix.postTranslate(-minX, -minY)
+        val dst = Bitmap.createBitmap(newW, newH, Bitmap.Config.ARGB_8888)
+        android.graphics.Canvas(dst).drawBitmap(bmp, rotMatrix, null)
+        bmp = dst
     }
 
     if (flipH || flipV) {

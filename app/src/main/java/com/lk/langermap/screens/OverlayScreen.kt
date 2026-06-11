@@ -17,8 +17,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,23 +32,124 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.lk.langermap.R
 import com.lk.langermap.ui.theme.robotoRegular
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 
 @Preview
 @Composable
 fun OverlayScreen(
-    photoUri: String = "",                        // URI stringa della foto caricata
-    overlayRes: Int = R.drawable.langer_forehead, // drawable linee Langer dalla regione selezionata
+    photoUri: String = "",
+    overlayRes: Int = R.drawable.langer_forehead,
+    initialOffsetX: Float = 0f,
+    initialOffsetY: Float = 0f,
+    initialScale: Float = 1f,
+    initialRotation: Float = 0f,
+    initialOpacity: Float = 0.75f,
+    initialColor: Color = Color.Black,
+    onStateChanged: (Float, Float, Float, Float, Float, Color) -> Unit = { _, _, _, _, _, _ -> },
     onBack: () -> Unit = {},
-    onFinish: () -> Unit = {}
+    onFinish: (String) -> Unit = {}
 ) {
-    // ── STATO TRASFORMAZIONI OVERLAY ─────────────────────────────
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var offsetY by remember { mutableFloatStateOf(0f) }
-    var scale   by remember { mutableFloatStateOf(1f) }
-    var rotation by remember { mutableFloatStateOf(0f) }
-    var opacity by remember { mutableFloatStateOf(0.75f) }
-    var selectedColor by remember { mutableStateOf(Color.Black) }
+    var offsetX       by remember { mutableFloatStateOf(initialOffsetX) }
+    var offsetY       by remember { mutableFloatStateOf(initialOffsetY) }
+    var scale         by remember { mutableFloatStateOf(initialScale) }
+    var rotation      by remember { mutableFloatStateOf(initialRotation) }
+    var opacity       by remember { mutableFloatStateOf(initialOpacity) }
+    var selectedColor by remember { mutableStateOf(initialColor) }
+    var showFullscreen by remember { mutableStateOf(false) }
+
+    // ── DIMENSIONI REALI DELLA BOX (pixel fisici) ─────────────────
+    var boxWidthPx  by remember { mutableIntStateOf(0) }
+    var boxHeightPx by remember { mutableIntStateOf(0) }
+
+    val context        = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // ── COMPOSIZIONE BITMAP ──────────────────────────────────────
+    fun composeBitmap(onReady: (Uri) -> Unit) {
+        val bw: Int = boxWidthPx
+        val bh: Int = boxHeightPx
+        if (bw == 0 || bh == 0) return
+
+        val capturedScale    : Float = scale
+        val capturedRotation : Float = rotation
+        val capturedOffsetX  : Float = offsetX
+        val capturedOffsetY  : Float = offsetY
+        val capturedOpacity  : Float = opacity
+        val capturedColor    : Color = selectedColor
+
+        coroutineScope.launch(Dispatchers.IO) {
+
+            val photoBitmap = BitmapUtils.loadBitmapFromUri(context, Uri.parse(photoUri))
+                ?: return@launch
+
+            val overlayBitmap = android.graphics.BitmapFactory.decodeResource(
+                context.resources, overlayRes
+            ) ?: return@launch
+
+            val wBmp: Float = photoBitmap.width.toFloat()
+            val hBmp: Float = photoBitmap.height.toFloat()
+            val wBox: Float = bw.toFloat()
+            val hBox: Float = bh.toFloat()
+            val wOv : Float = overlayBitmap.width.toFloat()
+            val hOv : Float = overlayBitmap.height.toFloat()
+
+            val cropScale: Float = maxOf(wBox / wBmp, hBox / hBmp)
+            val fitScaleBox: Float = minOf(wBox / wOv, hBox / hOv)
+            val fitScaleBmp: Float = fitScaleBox / cropScale
+
+            val cxBmp: Float = wBmp / 2f
+            val cyBmp: Float = hBmp / 2f
+
+            val outW: Int = photoBitmap.width
+            val outH: Int = photoBitmap.height
+            val result = android.graphics.Bitmap.createBitmap(
+                outW, outH, android.graphics.Bitmap.Config.ARGB_8888
+            )
+            val canvas = android.graphics.Canvas(result)
+
+            canvas.drawBitmap(photoBitmap, 0f, 0f, null)
+
+            val paint = android.graphics.Paint().apply {
+                alpha = (capturedOpacity * 255).toInt()
+                colorFilter = android.graphics.PorterDuffColorFilter(
+                    capturedColor.toArgb(),
+                    android.graphics.PorterDuff.Mode.SRC_IN
+                )
+            }
+
+            val matrix = android.graphics.Matrix()
+            matrix.setScale(fitScaleBmp, fitScaleBmp)
+
+            val scaledOvW: Float = wOv * fitScaleBmp
+            val scaledOvH: Float = hOv * fitScaleBmp
+            matrix.postTranslate(
+                (wBmp - scaledOvW) / 2f,
+                (hBmp - scaledOvH) / 2f
+            )
+
+            matrix.postTranslate(-cxBmp, -cyBmp)
+            matrix.postScale(capturedScale, capturedScale)
+            matrix.postRotate(capturedRotation)
+            matrix.postTranslate(cxBmp, cyBmp)
+
+            matrix.postTranslate(
+                capturedOffsetX / cropScale,
+                capturedOffsetY / cropScale
+            )
+
+            canvas.drawBitmap(overlayBitmap, matrix, paint)
+
+            val savedUri: Uri = BitmapUtils.saveBitmapToCache(result, context)
+            withContext(Dispatchers.Main) {
+                onReady(savedUri)
+            }
+        }
+    }
 
     // ── STORICO PER UNDO ─────────────────────────────────────────
     data class Snapshot(
@@ -55,8 +159,11 @@ fun OverlayScreen(
     val history = remember { ArrayDeque<Snapshot>() }
 
     fun saveHistory() {
-        history.addLast(Snapshot(offsetX, offsetY, scale, rotation, opacity, selectedColor))
+        history.addLast(
+            Snapshot(offsetX, offsetY, scale, rotation, opacity, selectedColor)
+        )
         if (history.size > 20) history.removeFirst()
+        onStateChanged(offsetX, offsetY, scale, rotation, opacity, selectedColor)
     }
 
     fun undo() {
@@ -126,6 +233,10 @@ fun OverlayScreen(
                 .background(
                     colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.1f)
                 )
+                .onSizeChanged { size ->
+                    boxWidthPx  = size.width
+                    boxHeightPx = size.height
+                }
         ) {
             // LAYER 1 — Foto (fissa, non trasformabile)
             if (photoUri.isNotEmpty()) {
@@ -138,7 +249,6 @@ fun OverlayScreen(
             }
 
             // LAYER 2 — Linee di Langer sopra la foto
-            // Gestures: 1 dito = drag, 2 dita = pinch zoom + rotazione
             Image(
                 painter = painterResource(id = overlayRes),
                 contentDescription = "Linee di Langer",
@@ -172,6 +282,7 @@ fun OverlayScreen(
                     .align(Alignment.BottomEnd)
                     .padding(8.dp)
                     .size(28.dp)
+                    .clickable { showFullscreen = true }
             )
         }
 
@@ -182,14 +293,20 @@ fun OverlayScreen(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
         ) {
-            HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light_trasl))
+            HorizontalDivider(
+                modifier = Modifier.weight(1f),
+                color = colorResource(id = R.color.lav_light_trasl)
+            )
             Text(
                 text = "more overlay settings",
                 fontSize = 12.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
-            HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light_trasl))
+            HorizontalDivider(
+                modifier = Modifier.weight(1f),
+                color = colorResource(id = R.color.lav_light_trasl)
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -292,7 +409,10 @@ fun OverlayScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(painter = painterResource(id = R.drawable.ic_undo), contentDescription = null)
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_undo),
+                    contentDescription = null
+                )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Undo", color = Color.DarkGray)
             }
@@ -302,12 +422,16 @@ fun OverlayScreen(
                     offsetX = 0f; offsetY = 0f
                     scale = 1f; rotation = 0f
                     opacity = 0.75f; selectedColor = Color.Black
+                    onStateChanged(0f, 0f, 1f, 0f, 0.75f, Color.Black)
                 },
                 modifier = Modifier.weight(1f),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
                 shape = RoundedCornerShape(16.dp)
             ) {
-                Icon(painter = painterResource(id = R.drawable.ic_reset), contentDescription = null)
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_reset),
+                    contentDescription = null
+                )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Reset", color = Color.DarkGray)
             }
@@ -317,7 +441,11 @@ fun OverlayScreen(
 
         // ── FINISH ────────────────────────────────────────────────
         Button(
-            onClick = onFinish,
+            onClick = {
+                composeBitmap { composedUri ->
+                    onFinish(composedUri.toString())
+                }
+            },
             modifier = Modifier
                 .width(160.dp)
                 .height(50.dp),
@@ -335,5 +463,88 @@ fun OverlayScreen(
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        if (showFullscreen) {
+            var fsWidthPx  by remember { mutableIntStateOf(0) }
+            var fsHeightPx by remember { mutableIntStateOf(0) }
+
+            Dialog(
+                onDismissRequest = { showFullscreen = false },
+                properties = DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = true
+                )
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black)
+                        .clickable { showFullscreen = false }
+                        .onSizeChanged { size ->
+                            fsWidthPx  = size.width
+                            fsHeightPx = size.height
+                        }
+                ) {
+                    // LAYER 1 — Foto fullscreen
+                    if (photoUri.isNotEmpty()) {
+                        AsyncImage(
+                            model = Uri.parse(photoUri),
+                            contentDescription = "Fullscreen foto paziente",
+                            // Usiamo Fit come nella box originale (non Crop)
+                            // così la foto e l'overlay occupano lo stesso spazio visivo
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    // LAYER 2 — Overlay con trasformazioni riscalate
+                    // Calcola il fattore di scala tra la fullscreen e la box originale.
+                    // Usiamo min() per mantenere le proporzioni (stesso di ContentScale.Fit).
+                    val uniformScale = if (boxWidthPx > 0 && boxHeightPx > 0 &&
+                                          fsWidthPx > 0 && fsHeightPx > 0) {
+                        minOf(
+                            fsWidthPx.toFloat()  / boxWidthPx.toFloat(),
+                            fsHeightPx.toFloat() / boxHeightPx.toFloat()
+                        )
+                    } else 1f
+
+                    // offsetX/offsetY vengono scalati proporzionalmente alla nuova dimensione.
+                    // scale e rotation rimangono invariati: graphicsLayer li applica
+                    // rispetto al centro del composable, indipendentemente dalle dimensioni.
+                    Image(
+                        painter = painterResource(id = overlayRes),
+                        contentDescription = "Linee di Langer fullscreen",
+                        contentScale = ContentScale.Fit,
+                        colorFilter = ColorFilter.tint(selectedColor.copy(alpha = opacity)),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .offset {
+                                IntOffset(
+                                    (offsetX * uniformScale).roundToInt(),
+                                    (offsetY * uniformScale).roundToInt()
+                                )
+                            }
+                            .graphicsLayer(
+                                scaleX    = scale,
+                                scaleY    = scale,
+                                rotationZ = rotation
+                            )
+                    )
+
+                    // Icona chiudi fullscreen
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_full_screen),
+                        contentDescription = "Chiudi fullscreen",
+                        tint = Color.White,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(16.dp)
+                            .size(32.dp)
+                            .clickable { showFullscreen = false }
+                    )
+                }
+            }
+        }
     }
 }

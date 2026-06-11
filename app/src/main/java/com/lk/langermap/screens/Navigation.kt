@@ -9,30 +9,60 @@ import androidx.navigation.navArgument
 import java.net.URLDecoder
 import java.net.URLEncoder
 import android.net.Uri
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.platform.LocalContext
+import com.lk.langermap.AppViewModel
+import androidx.core.net.toUri
 
 @Composable
-fun Navigation() {
+fun Navigation(viewModel: AppViewModel) {
     val navController = rememberNavController()
 
     NavHost(
         navController = navController,
-        startDestination = "home"
+        startDestination = "home",
+        enterTransition = { EnterTransition.None },
+        exitTransition = { ExitTransition.None },
+        popEnterTransition = { EnterTransition.None },
+        popExitTransition = { ExitTransition.None }
     ) {
 
         // HOME
-        composable("home") {
-            HomeScreen(
-                onNavigateToRegion = {              // nome originale di HomeScreen.kt
-                    navController.navigate("sex")
-                }
-            )
+        composable(
+            "home",
+            exitTransition = {
+                if (targetState.destination.route == "sex") {
+                    slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(500))
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.destination.route == "sex") {
+                    slideInVertically(initialOffsetY = { -it }, animationSpec = tween(500))
+                } else null
+            }
+        ) {
+            HomeScreen(onNavigateToRegion = { navController.navigate("sex") })
         }
 
         // SEX
-        composable("sex") {
+        composable(
+            "sex",
+            enterTransition = {
+                if (initialState.destination.route == "home") {
+                    slideInVertically(initialOffsetY = { it }, animationSpec = tween(500))
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.destination.route == "home") {
+                    slideOutVertically(targetOffsetY = { it }, animationSpec = tween(500))
+                } else null
+            }
+        ) {
             SexScreen(
+                initialSex = viewModel.selectedSex,
                 onNavigateToRegion = { sex ->
+                    viewModel.selectedSex = sex
                     navController.navigate("region/$sex")
                 }
             )
@@ -41,16 +71,19 @@ fun Navigation() {
         // SELEZIONE REGIONE
         composable(
             route = "region/{sex}",
-            arguments = listOf(
-                navArgument("sex") { type = NavType.StringType }
-            )
+            arguments = listOf(navArgument("sex") { type = NavType.StringType })
         ) { backStackEntry ->
             val sex = backStackEntry.arguments?.getString("sex") ?: ""
             RegionScreen(
                 sex = sex,
-                onNavigateToUpload = { drawableResId, region ->
+                initialRegion = viewModel.selectedRegion,
+                initialPov = viewModel.selectedPov,
+                onNavigateToUpload = { drawableResId, region, selectedRegion, selectedPov ->
+                    viewModel.selectedRegion = selectedRegion
+                    viewModel.selectedPov = selectedPov
                     navController.navigate("upload/$drawableResId/$region")
-                }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
 
@@ -64,9 +97,13 @@ fun Navigation() {
         ) { backStackEntry ->
             val drawableResId = backStackEntry.arguments?.getInt("regionDrawableResId") ?: 0
             val region = backStackEntry.arguments?.getString("region") ?: ""
+            viewModel.selectedDrawableResId = drawableResId
+            viewModel.selectedRegionName = region
             UploadScreen(
                 regionDrawableResId = drawableResId,
                 regionName = region,
+                initialImageUri = viewModel.selectedImageUri,
+                onImageSelected = { uri: Uri? -> viewModel.selectedImageUri = uri },
                 onNavigateToSettings = { photoUriString ->
                     val encoded = URLEncoder.encode(photoUriString, "UTF-8")
                     navController.navigate("edit/$encoded/$drawableResId")
@@ -85,16 +122,14 @@ fun Navigation() {
         // FOTOCAMERA
         composable(
             route = "camera/{regionDrawableResId}",
-            arguments = listOf(
-                navArgument("regionDrawableResId") { type = NavType.IntType }
-            )
+            arguments = listOf(navArgument("regionDrawableResId") { type = NavType.IntType })
         ) { backStackEntry ->
             val drawableResId = backStackEntry.arguments?.getInt("regionDrawableResId") ?: 0
             CameraScreen(
                 regionDrawableResId = drawableResId,
                 onNavigateToOverlay = { photoUri, resId ->
-                    val encoded = URLEncoder.encode(photoUri, "UTF-8")
-                    navController.navigate("edit/$encoded/$resId")
+                    viewModel.selectedImageUri = photoUri.toUri()
+                    navController.navigate("upload/${viewModel.selectedDrawableResId}/${viewModel.selectedRegionName}")
                 },
                 onNavigateBack = { navController.popBackStack() }
             )
@@ -108,21 +143,18 @@ fun Navigation() {
                 navArgument("regionDrawableResId") { type = NavType.IntType }
             )
         ) { backStackEntry ->
-            // ← context preso dal composable, non dal NavController
             val context       = LocalContext.current
             val encodedUri    = backStackEntry.arguments?.getString("photoUri") ?: ""
-            val photoUri      = Uri.parse(URLDecoder.decode(encodedUri, "UTF-8"))
+            val photoUri      = URLDecoder.decode(encodedUri, "UTF-8").toUri()
             val drawableResId = backStackEntry.arguments?.getInt("regionDrawableResId") ?: 0
 
             EditPhotoScreen(
                 photoUri = photoUri,
                 onBack   = { navController.popBackStack() },
                 onApply  = { editedBitmap ->
-                    // Salva il bitmap editato in cache e naviga all'overlay
-                    val savedUri = saveBitmapToCache(editedBitmap, context)
+                    val savedUri = BitmapUtils.saveBitmapToCache(editedBitmap, context)
                     val encoded  = URLEncoder.encode(savedUri.toString(), "UTF-8")
                     navController.navigate("overlay/$encoded/$drawableResId") {
-                        // Rimuove edit dallo stack: Back dall'overlay → torna a camera
                         popUpTo("edit/{photoUri}/{regionDrawableResId}") { inclusive = true }
                     }
                 }
@@ -143,9 +175,23 @@ fun Navigation() {
             OverlayScreen(
                 photoUri   = photoUri,
                 overlayRes = drawableResId,
-                onBack     = { navController.popBackStack() },
-                onFinish = {
-                    val encoded = URLEncoder.encode(photoUri, "UTF-8")
+                initialOffsetX    = viewModel.overlayOffsetX,
+                initialOffsetY    = viewModel.overlayOffsetY,
+                initialScale      = viewModel.overlayScale,
+                initialRotation   = viewModel.overlayRotation,
+                initialOpacity    = viewModel.overlayOpacity,
+                initialColor      = viewModel.overlayColor,
+                onStateChanged    = { ox, oy, sc, rot, op, col ->
+                    viewModel.overlayOffsetX  = ox
+                    viewModel.overlayOffsetY  = oy
+                    viewModel.overlayScale    = sc
+                    viewModel.overlayRotation = rot
+                    viewModel.overlayOpacity  = op
+                    viewModel.overlayColor    = col
+                },
+                onBack   = { navController.popBackStack() },
+                onFinish = { composedUri ->
+                    val encoded = URLEncoder.encode(composedUri, "UTF-8")
                     navController.navigate("output/$encoded")
                 }
             )
@@ -154,15 +200,13 @@ fun Navigation() {
         // OUTPUT
         composable(
             route = "output/{photoUri}",
-            arguments = listOf(
-                navArgument("photoUri") { type = NavType.StringType }
-            )
+            arguments = listOf(navArgument("photoUri") { type = NavType.StringType })
         ) { backStackEntry ->
             val encodedUri = backStackEntry.arguments?.getString("photoUri") ?: ""
-            val photoUri = URLDecoder.decode(encodedUri, "UTF-8")
+            val photoUri   = URLDecoder.decode(encodedUri, "UTF-8")
             OutputScreen(
                 photoUri = photoUri,
-                onBack = { navController.popBackStack() },
+                onBack   = { navController.popBackStack() },
                 onNavigateToBackHome = {
                     navController.navigate("backhome") {
                         popUpTo("home") { inclusive = false }
