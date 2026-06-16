@@ -3,7 +3,6 @@ package com.lk.langermap.screens
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -11,7 +10,6 @@ import android.provider.MediaStore
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -53,12 +51,11 @@ fun OutputScreen(
             .background(Color.White)
             .statusBarsPadding()
             .padding(horizontal = 16.dp)
-        // ✅ FIX: blocca i touch events dal passare alla schermata sottostante
-        .pointerInput(Unit) { detectTapGestures { } },
-    horizontalAlignment = Alignment.CenterHorizontally
-) { 
+            .pointerInput(Unit) { detectTapGestures { } },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
 
-        // Top bar
+        // ── Top bar ──────────────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -79,7 +76,7 @@ fun OutputScreen(
             )
         }
 
-        // Titolo
+        // ── Titolo ───────────────────────────────────────────────────────────
         Text(
             text = "Here's your result !",
             fontSize = 28.sp,
@@ -93,32 +90,45 @@ fun OutputScreen(
             modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
         )
 
-        // Anteprima immagine
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(
-                    width = 1.dp,
-                    color = colorResource(id = R.color.lav_light),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .background(colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.2f))
-        ) {
-            if (photoUri.isNotEmpty()) {
-                AsyncImage(
-                    model = Uri.parse(photoUri),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
+        // ── Anteprima immagine a piena larghezza ─────────────────────────────
+        // L'immagine si espande fino a tutta la larghezza disponibile mantenendo
+        // le proporzioni originali (wrapContentHeight + ContentScale.FillWidth).
+        // heightIn limita il box: min 180dp per non collassare, max 420dp per
+        // lasciare spazio ai controlli anche su schermi piccoli.
+        if (photoUri.isNotEmpty()) {
+            AsyncImage(
+                model = Uri.parse(photoUri),
+                contentDescription = null,
+                contentScale = ContentScale.FillWidth,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 180.dp, max = 420.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(
+                        width = 1.dp,
+                        color = colorResource(id = R.color.lav_light),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+            )
+        } else {
+            // Placeholder quando non c'è URI
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.2f))
+                    .border(
+                        width = 1.dp,
+                        color = colorResource(id = R.color.lav_light),
+                        shape = RoundedCornerShape(16.dp)
+                    )
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Divider download options
+        // ── Divider download options ──────────────────────────────────────────
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -135,7 +145,7 @@ fun OutputScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Selezione formato
+        // ── Selezione formato ─────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -166,7 +176,7 @@ fun OutputScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Save to gallery
+        // ── Save to gallery ───────────────────────────────────────────────────
         Button(
             onClick = {
                 saveToGallery(context, photoUri, selectedFormat)
@@ -196,7 +206,7 @@ fun OutputScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Share image
+        // ── Share image ───────────────────────────────────────────────────────
         Button(
             onClick = {
                 shareImage(context, photoUri)
@@ -228,13 +238,13 @@ fun OutputScreen(
     }
 }
 
+// ── SAVE TO GALLERY ───────────────────────────────────────────────────────────
 private fun saveToGallery(context: Context, photoUri: String, format: String) {
-    // salva l'immagine nella galleria
     val uri = Uri.parse(photoUri)
     val mimeType = when (format) {
         "JPEG" -> "image/jpeg"
-        "PDF" -> "application/pdf"
-        else -> "image/png"
+        "PDF"  -> "application/pdf"
+        else   -> "image/png"
     }
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, "LangerMap_${System.currentTimeMillis()}")
@@ -255,45 +265,24 @@ private fun saveToGallery(context: Context, photoUri: String, format: String) {
 }
 
 // ── SHARE IMAGE ───────────────────────────────────────────────────────────────
-//
-// FIX 1 — FileProvider invece di Uri.fromFile / file://
-//   I file in cache (file://) non sono leggibili dalle altre app per motivi di
-//   sicurezza (FileUriExposedException su API 24+). FileProvider genera un URI
-//   content:// con permesso di lettura temporaneo riconosciuto dal sistema.
-//
-// FIX 2 — FLAG_ACTIVITY_NEW_TASK
-//   startActivity() chiamato da un Context non-Activity richiede questo flag,
-//   altrimenti il sistema lancia un'eccezione silenziosa e il chooser non appare.
-//
-// FIX 3 — chooser creato con Intent.createChooser + FLAG_ACTIVITY_NEW_TASK
-//   Il chooser stesso è un'Activity separata; deve ereditare il flag.
-//
 private fun shareImage(context: Context, photoUri: String) {
     try {
         val originalUri = Uri.parse(photoUri)
-
-        // Converti file:// → content:// tramite FileProvider
-        // (se è già un content:// lo usiamo direttamente)
         val shareUri: Uri = if (originalUri.scheme == "file") {
             val file = File(originalUri.path ?: return)
             FileProvider.getUriForFile(
                 context,
-                // Deve corrispondere all'authority dichiarata nel Manifest:
-                // <provider android:authorities="${applicationId}.provider" .../>
                 "${context.packageName}.provider",
                 file
             )
         } else {
-            // content:// già compatibile
             originalUri
         }
 
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "image/*"
             putExtra(Intent.EXTRA_STREAM, shareUri)
-            // Permesso di lettura esplicito per le app che ricevono l'intent
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            // Necessario quando startActivity() viene chiamato fuori da un'Activity
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
@@ -302,7 +291,6 @@ private fun shareImage(context: Context, photoUri: String) {
         }
 
         context.startActivity(chooser)
-
     } catch (e: Exception) {
         e.printStackTrace()
     }
