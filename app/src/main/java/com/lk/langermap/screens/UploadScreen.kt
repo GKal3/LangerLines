@@ -40,6 +40,8 @@ fun UploadScreen(
     onNavigateToOverlay: (String) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
+    val teal          = colorResource(id = R.color.teal)
+
     var selectedImageUri by remember { mutableStateOf(initialImageUri) }
 
     // launcher per scegliere file dalla galleria
@@ -55,46 +57,45 @@ fun UploadScreen(
             .fillMaxSize()
             .background(Color.White)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // Top bar
+        // ── HEADER ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .height(56.dp)
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_back_arrow),
+                    painter            = painterResource(id = R.drawable.ic_back_arrow),
                     contentDescription = "Back"
                 )
             }
-            Image(
-                painter = painterResource(id = R.drawable.logo_lm),
-                contentDescription = null,
-                modifier = Modifier.size(40.dp)
+            Text(
+                text       = "Upload patient image",
+                fontSize   = 18.sp,
+                fontFamily = robotoSemiBold,
+                color      = Color.Black,
+                modifier   = Modifier
+                    .weight(1f)
+                    .padding(start = 8.dp)
             )
+            TextButton(onClick = {
+                selectedImageUri?.let { uri ->
+                    onNavigateToOverlay(uri.toString())
+                }
+            }) {
+                Text("Next", color = teal, fontSize = 16.sp)
+            }
         }
-
-        // Titolo
-        Text(
-            text = "Upload patient image",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp)
-        )
 
         // Chip regione selezionata
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .background(
                     color = colorResource(id = R.color.lav_light),
                     shape = RoundedCornerShape(8.dp)
@@ -121,7 +122,8 @@ fun UploadScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp)
+                .padding(horizontal = 16.dp)
+                .height(330.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .border(
                     width = 1.dp,
@@ -163,7 +165,7 @@ fun UploadScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(30.dp))
 
         // Divider "or choose source"
         Row(
@@ -186,6 +188,7 @@ fun UploadScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .background(
                     color = Color.LightGray.copy(alpha = 0.4f),
                     shape = RoundedCornerShape(12.dp)
@@ -207,12 +210,13 @@ fun UploadScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Upload from files
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .padding(horizontal = 16.dp)
                 .background(
                     color = Color.LightGray.copy(alpha = 0.4f),
                     shape = RoundedCornerShape(12.dp)
@@ -234,12 +238,15 @@ fun UploadScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
         // Settings e Delete
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 59.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Button(
                 onClick = {
@@ -252,12 +259,15 @@ fun UploadScreen(
                     .weight(1f)
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = colorResource(id = R.color.lav_light_trasl)
+                    containerColor = colorResource(id = R.color.lav_light),
+                    disabledContainerColor = colorResource(id = R.color.lav_light_trasl)
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(
-                    painter = painterResource(id = R.drawable.ic_settings),
+                    painter = painterResource(id = R.drawable.ic_crop),
+                    modifier = Modifier.size(24.dp),
+                    tint = colorResource(id = R.color.w),
                     contentDescription = "Settings"
                 )
             }
@@ -266,44 +276,23 @@ fun UploadScreen(
                     selectedImageUri = null
                     onImageSelected(null)
                           },
+                enabled = selectedImageUri != null,
                 modifier = Modifier
                     .weight(1f)
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = colorResource(id = R.color.lav_light_trasl)
+                    containerColor = colorResource(id = R.color.lav_light),
+                    disabledContainerColor = colorResource(id = R.color.lav_light_trasl)
                 ),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_delete),
+                    modifier = Modifier.size(24.dp),
+                    tint = colorResource(id = R.color.w),
                     contentDescription = "Delete"
                 )
             }
         }
-
-        Spacer(modifier = Modifier.weight(1f))
-
-        // Next
-        Button(
-            onClick = {
-                selectedImageUri?.let { uri ->
-                    onNavigateToOverlay(uri.toString())
-                }
-            },
-            enabled = selectedImageUri != null,
-            modifier = Modifier
-                .width(117.dp)
-                .height(50.dp),
-            colors = nextButtonColors(),
-            shape = nextButtonShape
-        ) {
-            Text(
-                text = stringResource(id = R.string.btn_next),
-                fontSize = 24.sp,
-                fontFamily = robotoRegular
-            )
-        }
-
-        Spacer(modifier = Modifier.height(59.dp))
     }
 }

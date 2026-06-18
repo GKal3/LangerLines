@@ -45,56 +45,56 @@ fun OutputScreen(
     var selectedFormat by remember { mutableStateOf("PNG") }
     val formats = listOf("PNG", "JPEG", "PDF")
 
+    val black = colorResource(id = R.color.b)
+    val teal  = colorResource(id = R.color.teal)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.White)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp)
             .pointerInput(Unit) { detectTapGestures { } },
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        // ── Top bar ──────────────────────────────────────────────────────────
+        // ── HEADER ────────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 16.dp, bottom = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .height(56.dp)
+                .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_back_arrow),
-                    contentDescription = "Back"
+                    contentDescription = "Back",
+                    tint = black
                 )
             }
-            Image(
-                painter = painterResource(id = R.drawable.logo_lm),
-                contentDescription = null,
-                modifier = Modifier.size(40.dp)
+            Text(
+                text = "Here's your result!",
+                fontSize = 18.sp,
+                fontFamily = robotoSemiBold,
+                color = black,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 8.dp)
             )
         }
 
-        // ── Titolo ───────────────────────────────────────────────────────────
-        Text(
-            text = "Here's your result !",
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Black
-        )
+        // ── Subtitle ─────────────────────────────────────────────
         Text(
             text = "Save or share the final image",
-            fontSize = 14.sp,
+            fontSize = 13.sp,
             color = Color.Gray,
-            modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+            modifier = Modifier
+                .align(Alignment.Start)
+                .padding(start = 8.dp, bottom = 12.dp)
+                .padding(horizontal = 16.dp)
         )
 
-        // ── Anteprima immagine a piena larghezza ─────────────────────────────
-        // L'immagine si espande fino a tutta la larghezza disponibile mantenendo
-        // le proporzioni originali (wrapContentHeight + ContentScale.FillWidth).
-        // heightIn limita il box: min 180dp per non collassare, max 420dp per
-        // lasciare spazio ai controlli anche su schermi piccoli.
+        // ── Anteprima immagine ────────────────────────────────────
         if (photoUri.isNotEmpty()) {
             AsyncImage(
                 model = Uri.parse(photoUri),
@@ -102,7 +102,8 @@ fun OutputScreen(
                 contentScale = ContentScale.FillWidth,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 180.dp, max = 420.dp)
+                    .heightIn(min = 180.dp, max = 400.dp)
+                    .padding(horizontal = 16.dp)
                     .clip(RoundedCornerShape(16.dp))
                     .border(
                         width = 1.dp,
@@ -111,12 +112,12 @@ fun OutputScreen(
                     )
             )
         } else {
-            // Placeholder quando non c'è URI
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
                     .clip(RoundedCornerShape(16.dp))
+                    .padding(horizontal = 16.dp)
                     .background(colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.2f))
                     .border(
                         width = 1.dp,
@@ -126,16 +127,18 @@ fun OutputScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // ── Divider download options ──────────────────────────────────────────
+        // ── Divider download options ──────────────────────────────
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
         ) {
             HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light))
             Text(
-                text = "Download options",
+                text = "download options",
                 fontSize = 12.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(horizontal = 8.dp)
@@ -143,11 +146,13 @@ fun OutputScreen(
             HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light))
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // ── Selezione formato ─────────────────────────────────────────────────
+        // ── Selezione formato ─────────────────────────────────────
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             formats.forEach { format ->
@@ -176,7 +181,7 @@ fun OutputScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // ── Save to gallery ───────────────────────────────────────────────────
+        // ── Save to gallery ───────────────────────────────────────
         Button(
             onClick = {
                 saveToGallery(context, photoUri, selectedFormat)
@@ -184,16 +189,19 @@ fun OutputScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(56.dp)
+                .padding(horizontal = 16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = colorResource(id = R.color.teal_light)
+                containerColor = colorResource(id = R.color.teal_light),
+                contentColor = Color.Black
             ),
             shape = RoundedCornerShape(24.dp)
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_download_arrow),
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
+                tint = Color.Black
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -206,7 +214,7 @@ fun OutputScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ── Share image ───────────────────────────────────────────────────────
+        // ── Share image ───────────────────────────────────────────
         Button(
             onClick = {
                 shareImage(context, photoUri)
@@ -214,16 +222,19 @@ fun OutputScreen(
             },
             modifier = Modifier
                 .fillMaxWidth()
-                .height(56.dp),
+                .height(56.dp)
+                .padding(horizontal = 16.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = colorResource(id = R.color.teal_light)
+                containerColor = colorResource(id = R.color.teal_light),
+                contentColor = Color.Black
             ),
             shape = RoundedCornerShape(24.dp)
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_share),
                 contentDescription = null,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(20.dp),
+                tint = Color.Black
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
@@ -234,7 +245,7 @@ fun OutputScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(59.dp))
     }
 }
 

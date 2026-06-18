@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -26,9 +27,9 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,8 +48,23 @@ private const val MAX_PREVIEW_PX = 1280
 data class EditState(
     val cropRect: Rect = Rect(0f, 0f, 1f, 1f),
     val angleDeg: Float = 0f,
-    val rotate90Count: Int = 0,          // multiples of 90° CCW
+    val rotate90Count: Int = 0,
     val flipHorizontal: Boolean = false
+)
+
+/**
+ * Trasforma il rettangolo di crop (normalizzato 0..1) per tenerlo coerente
+ * con una rotazione di 90° in senso antiorario del frame (la stessa rotazione
+ * applicata dal pulsante "Rotate90": totalAngle += -90°).
+ *
+ * Senza questa trasformazione, ruotando la foto il ritaglio fatto in precedenza
+ * andrebbe perso (perché il box cambia dimensioni: W e H si scambiano).
+ */
+private fun rotateCropRect90(r: Rect): Rect = Rect(
+    left   = r.top,
+    top    = 1f - r.right,
+    right  = r.bottom,
+    bottom = 1f - r.left
 )
 
 @Preview(showBackground = true)
@@ -69,12 +85,12 @@ fun EditPhotoScreen(
             val full = withContext(Dispatchers.IO) { loadBitmapFromUri(context, photoUri) }
             originalBitmap = full
             previewBitmap  = withContext(Dispatchers.IO) { scaledForPreview(full) }
+            editState = EditState() // nuova foto -> stato di editing pulito
         }
     }
 
     val lavLight      = colorResource(id = R.color.lav_light)
     val lavLightTrasl = colorResource(id = R.color.lav_light_trasl)
-    val grey          = colorResource(id = R.color.grey)
     val black         = colorResource(id = R.color.b)
     val white         = colorResource(id = R.color.w)
     val teal          = colorResource(id = R.color.teal)
@@ -82,7 +98,7 @@ fun EditPhotoScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(white)
+            .background(Color(0xFF2C2C2C))
             .statusBarsPadding()
     ) {
         // ── HEADER ───────────────────────────────────────────────
@@ -90,6 +106,7 @@ fun EditPhotoScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp)
+                .background(white)
                 .padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -114,9 +131,76 @@ fun EditPhotoScreen(
             }
         }
 
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // ── TOOLBAR: Flip + Rotate90 (sx) — Reset (dx) ────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                IconButton(
+                    onClick  = { editState = editState.copy(flipHorizontal = !editState.flipHorizontal) },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = if (editState.flipHorizontal) lavLight else lavLightTrasl,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.Flip,
+                        contentDescription = "Flip",
+                        modifier           = Modifier
+                            .size(24.dp)
+                            .graphicsLayer { rotationZ = 90f }
+                    )
+                }
+                IconButton(
+                    onClick  = {
+                        editState = editState.copy(
+                            rotate90Count = editState.rotate90Count + 1,
+                            cropRect      = rotateCropRect90(editState.cropRect)
+                        )
+                    },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(lavLightTrasl, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        painter            = painterResource(R.drawable.ic_rotate90),
+                        contentDescription = "Rotate",
+                        modifier           = Modifier.size(24.dp)
+                    )
+                }
+            }
+
+            OutlinedButton(
+                onClick = { editState = EditState() },
+                shape  = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor   = black,
+                    containerColor = white
+                )
+            ) {
+                Icon(
+                    painterResource(id = R.drawable.ic_reset),
+                    contentDescription = null,
+                    modifier           = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Reset", fontFamily = robotoRegular, fontSize = 14.sp)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
         // ── TOOL AREA ────────────────────────────────────────────
         Box(
-            modifier        = Modifier
+            modifier         = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(horizontal = 16.dp),
@@ -125,116 +209,12 @@ fun EditPhotoScreen(
             CropRotateTool(
                 bitmap         = previewBitmap,
                 editState      = editState,
-                onCropChanged  = { editState = editState.copy(cropRect = it) },
-                onAngleChanged = { editState = editState.copy(angleDeg = it) },
-                lavLight       = lavLight,
-                lavLightTrasl  = lavLightTrasl
+                onCropChanged  = { newCrop -> editState = editState.copy(cropRect = newCrop) },
+                onAngleChanged = { editState = editState.copy(angleDeg = it) }
             )
         }
 
-        // ── Divider "Edit tools" ──────────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-        ) {
-            HorizontalDivider(color = grey)
-            Text(
-                text       = "Edit tools",
-                fontSize   = 11.sp,
-                fontFamily = robotoRegular,
-                color      = grey,
-                modifier   = Modifier
-                    .align(Alignment.TopCenter)
-                    .offset(y = (-8).dp)
-                    .background(white)
-                    .padding(horizontal = 6.dp)
-            )
-        }
-
-        // ── ICON BUTTONS: Flip H + Rotate 90° CCW ────────────────
-        Row(
-            modifier            = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-            verticalAlignment   = Alignment.CenterVertically
-        ) {
-            // Flip orizzontale
-            IconButton(
-                onClick  = { editState = editState.copy(flipHorizontal = !editState.flipHorizontal) },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = if (editState.flipHorizontal) lavLight else lavLightTrasl,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-            ) {
-                Icon(
-                    imageVector        = Icons.Filled.Flip,
-                    contentDescription = "Flip horizontal",
-                    tint               = black,
-                    modifier           = Modifier
-                        .size(24.dp)
-                        .graphicsLayer { rotationZ = 90f }   // Flip è verticale di default, ruotiamo l'icona
-                )
-            }
-
-            // Ruota 90° antiorario
-            IconButton(
-                onClick  = {
-                    editState = editState.copy(
-                        rotate90Count = editState.rotate90Count + 1
-                    )
-                },
-                modifier = Modifier
-                    .size(48.dp)
-                    .background(
-                        color = lavLightTrasl,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-            ) {
-                Icon(
-                    painter            = painterResource(id = R.drawable.ic_rotate90),
-                    contentDescription = "Rotate 90° CCW",
-                    tint               = black,
-                    modifier           = Modifier.size(24.dp)
-                )
-            }
-        }
-
-        // ── Undo + Reset ─────────────────────────────────────────
-        Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            OutlinedButton(
-                onClick = {
-                    editState = editState.copy(
-                        cropRect = Rect(0f, 0f, 1f, 1f),
-                        angleDeg = 0f
-                    )
-                },
-                shape  = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = black)
-            ) {
-                Icon(painterResource(id = R.drawable.ic_undo), null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Undo", fontFamily = robotoRegular, fontSize = 14.sp)
-            }
-
-            OutlinedButton(
-                onClick = { editState = EditState() },
-                shape   = RoundedCornerShape(20.dp),
-                colors  = ButtonDefaults.outlinedButtonColors(contentColor = black)
-            ) {
-                Icon(painterResource(id = R.drawable.ic_reset), null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Reset", fontFamily = robotoRegular, fontSize = 14.sp)
-            }
-        }
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -249,66 +229,117 @@ internal fun scaledForPreview(bitmap: Bitmap?): Bitmap? {
     return Bitmap.createScaledBitmap(bitmap, w, h, true)
 }
 
+// ─── Rettangolo della foto in coordinate del Box (ContentScale.Fit) ───────────
+private fun fitRect(boxW: Float, boxH: Float, imgW: Float, imgH: Float): Rect {
+    if (boxW <= 0f || boxH <= 0f || imgW <= 0f || imgH <= 0f) return Rect(0f, 0f, boxW, boxH)
+    val scale = minOf(boxW / imgW, boxH / imgH)
+    val w     = imgW * scale
+    val h     = imgH * scale
+    val left  = (boxW - w) / 2f
+    val top   = (boxH - h) / 2f
+    return Rect(left, top, left + w, top + h)
+}
+
 // ─── CROP + ROTATE TOOL ───────────────────────────────────────────────────────
-//
-// Architettura corretta:
-//   1. Box ESTERNO (frame dritto) con clipToBounds → taglia fisicamente la foto
-//      che sporge quando è ruotata/scalata. L'utente vede solo ciò che è dentro.
-//   2. La foto ruota + scala tramite graphicsLayer DENTRO il Box clippato.
-//   3. Il crop overlay (Canvas) disegna il rettangolo di crop in coordinate
-//      del Box esterno — quindi è sempre dritto e indipendente dalla rotazione.
-//   4. cropRect normalizzato [0..1] esprime la frazione del frame dritto,
-//      e applyEdits lo applica DOPO aver ruotato+scalato il bitmap.
-//
 @Composable
 private fun CropRotateTool(
     bitmap: Bitmap?,
     editState: EditState,
     onCropChanged: (Rect) -> Unit,
-    onAngleChanged: (Float) -> Unit,
-    lavLight: Color,
-    lavLightTrasl: Color
+    onAngleChanged: (Float) -> Unit
 ) {
-    var frameSize    by remember { mutableStateOf(IntSize.Zero) }
+    val lavLightColor = colorResource(id = R.color.lav_light)
+    val lavLightTrasl = colorResource(id = R.color.lav_light_trasl)
+
+    var boxSize     by remember { mutableStateOf(IntSize.Zero) }
+    var imageBounds by remember { mutableStateOf(Rect.Zero) }
     val cropPxState  = remember { mutableStateOf<Rect?>(null) }
     var activeHandle by remember { mutableStateOf<String?>(null) }
     val handlePx     = 40f
 
-    // Ogni volta che le dimensioni del frame cambiano, reset del crop all'intero frame
-    LaunchedEffect(frameSize) {
-        if (frameSize == IntSize.Zero) return@LaunchedEffect
-        val r = Rect(0f, 0f, frameSize.width.toFloat(), frameSize.height.toFloat())
-        cropPxState.value = r
-        onCropChanged(Rect(0f, 0f, 1f, 1f))
+    // Un solo effetto che gestisce TUTTI i casi in cui imageBounds/cropPx vanno
+    // ricalcolati: resize del box, cambio bitmap, rotate90 e modifiche manuali
+    // del crop (drag). In nessuno di questi casi il crop viene azzerato:
+    // viene semplicemente ri-denormalizzato sul nuovo imageBounds, oppure
+    // (nel caso del rotate90) arriva già trasformato da fuori (vedi
+    // rotateCropRect90), così il ritaglio fatto prima della rotazione non
+    // viene perso.
+    LaunchedEffect(boxSize, bitmap, editState.rotate90Count, editState.cropRect) {
+        if (boxSize == IntSize.Zero) return@LaunchedEffect
+        val bmpW = bitmap?.width?.toFloat()  ?: 1f
+        val bmpH = bitmap?.height?.toFloat() ?: 1f
+
+        // Se rotate90Count è dispari, larghezza e altezza si scambiano
+        val (effectiveW, effectiveH) = if (editState.rotate90Count % 2 == 0) {
+            bmpW to bmpH
+        } else {
+            bmpH to bmpW
+        }
+
+        val bounds = fitRect(
+            boxSize.width.toFloat(),
+            boxSize.height.toFloat(),
+            effectiveW,
+            effectiveH
+        )
+        imageBounds = bounds
+
+        val r = editState.cropRect
+        cropPxState.value = Rect(
+            r.left   * bounds.width,
+            r.top    * bounds.height,
+            r.right  * bounds.width,
+            r.bottom * bounds.height
+        )
     }
 
-    val angleRad  = Math.toRadians(abs(editState.angleDeg).toDouble())
-    val autoScale = (
+    val angleRad   = Math.toRadians(abs(editState.angleDeg).toDouble())
+    // autoScale compensa solo lo slider fine (angleDeg ±45°).
+    val autoScale  = (
             kotlin.math.abs(kotlin.math.cos(angleRad)).toFloat() +
                     kotlin.math.abs(kotlin.math.sin(angleRad)).toFloat()
             )
-    val totalAngle = editState.angleDeg - editState.rotate90Count * 90f
+    val totalAngle = editState.angleDeg + editState.rotate90Count * -90f
+
+    val bmpW = bitmap?.width?.toFloat()  ?: 1f
+    val bmpH = bitmap?.height?.toFloat() ?: 1f
+    val isTransposed = editState.rotate90Count % 2 != 0
+    // FIX "foto più piccola a 90°/270°":
+    // quando il box è trasposto, Image() esegue al suo interno un primo
+    // ContentScale.Fit usando le dimensioni ORIGINALI del bitmap (bmpW x bmpH)
+    // dentro un box pensato per (bmpH x bmpW). Dopo la rotazione di 90° questo
+    // contenuto risulta più piccolo del box di un fattore pari al rapporto
+    // lato corto/lato lungo. Il fattore di correzione (reciproco) va quindi
+    // moltiplicato alla scala per riportare la foto a riempire il box.
+    val rotationFitScale = if (isTransposed) {
+        maxOf(bmpW, bmpH) / minOf(bmpW, bmpH)
+    } else {
+        1f
+    }
 
     Column(
         modifier            = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ── Box clippato: la foto che sporge viene tagliata ───────
+        // ── Box esterno: rileva dimensioni, gestisce il drag ──────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .clipToBounds()                       // ← taglia fisicamente ciò che sporge
-                .onSizeChanged { size -> frameSize = size }
+                .clipToBounds()
+                .onSizeChanged { size -> boxSize = size }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down   = awaitFirstDown(requireUnconsumed = false)
-                        val rect   = cropPxState.value ?: return@awaitEachGesture
-                        val frameW = frameSize.width.toFloat()
-                        val frameH = frameSize.height.toFloat()
+                        val crop   = cropPxState.value ?: return@awaitEachGesture
+                        val bounds = imageBounds
+                        if (bounds == Rect.Zero) return@awaitEachGesture
 
-                        activeHandle = hitTestHandle(down.position, rect, handlePx)
-                            ?: if (rect.contains(down.position)) "body" else null
+                        // Il tocco arriva in coordinate del Box; lo convertiamo in coord. di imageBounds
+                        val localPos = down.position - Offset(bounds.left, bounds.top)
+
+                        activeHandle = hitTestHandle(localPos, crop, handlePx)
+                            ?: if (crop.contains(localPos)) "body" else null
 
                         if (activeHandle == null) return@awaitEachGesture
                         down.consume()
@@ -320,6 +351,8 @@ private fun CropRotateTool(
                             val dy      = delta.y
                             val cur     = cropPxState.value ?: return@drag
                             val minSize = 80f
+                            val maxW    = bounds.width
+                            val maxH    = bounds.height
 
                             val updated: Rect = when (activeHandle) {
                                 "tl" -> Rect(
@@ -330,23 +363,23 @@ private fun CropRotateTool(
                                 "tr" -> Rect(
                                     cur.left,
                                     (cur.top  + dy).coerceIn(0f, cur.bottom - minSize),
-                                    (cur.right + dx).coerceIn(cur.left + minSize, frameW),
+                                    (cur.right + dx).coerceIn(cur.left + minSize, maxW),
                                     cur.bottom
                                 )
                                 "bl" -> Rect(
                                     (cur.left + dx).coerceIn(0f, cur.right  - minSize),
                                     cur.top,
                                     cur.right,
-                                    (cur.bottom + dy).coerceIn(cur.top + minSize, frameH)
+                                    (cur.bottom + dy).coerceIn(cur.top + minSize, maxH)
                                 )
                                 "br" -> Rect(
                                     cur.left, cur.top,
-                                    (cur.right  + dx).coerceIn(cur.left + minSize, frameW),
-                                    (cur.bottom + dy).coerceIn(cur.top  + minSize, frameH)
+                                    (cur.right  + dx).coerceIn(cur.left + minSize, maxW),
+                                    (cur.bottom + dy).coerceIn(cur.top  + minSize, maxH)
                                 )
                                 "body" -> {
-                                    val newLeft = (cur.left + dx).coerceIn(0f, frameW - cur.width)
-                                    val newTop  = (cur.top  + dy).coerceIn(0f, frameH - cur.height)
+                                    val newLeft = (cur.left + dx).coerceIn(0f, maxW - cur.width)
+                                    val newTop  = (cur.top  + dy).coerceIn(0f, maxH - cur.height)
                                     Rect(newLeft, newTop, newLeft + cur.width, newTop + cur.height)
                                 }
                                 else -> cur
@@ -355,10 +388,10 @@ private fun CropRotateTool(
                             cropPxState.value = updated
                             onCropChanged(
                                 Rect(
-                                    updated.left   / frameW,
-                                    updated.top    / frameH,
-                                    updated.right  / frameW,
-                                    updated.bottom / frameH
+                                    updated.left   / maxW,
+                                    updated.top    / maxH,
+                                    updated.right  / maxW,
+                                    updated.bottom / maxH
                                 )
                             )
                         }
@@ -366,86 +399,97 @@ private fun CropRotateTool(
                     }
                 }
         ) {
-            // Foto ruotata e scalata; clipToBounds del Box padre la ritaglia
-            if (bitmap != null) {
-                androidx.compose.foundation.Image(
-                    bitmap             = bitmap.asImageBitmap(),
-                    contentDescription = null,
-                    contentScale       = ContentScale.Fit,
-                    modifier           = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            rotationZ = totalAngle
-                            scaleX    = autoScale * if (editState.flipHorizontal) -1f else 1f
-                            scaleY    = autoScale
+            val bounds = imageBounds
+            if (bounds != Rect.Zero) {
+                val density = LocalDensity.current
+                val offsetX = with(density) { bounds.left.toDp() }
+                val offsetY = with(density) { bounds.top.toDp() }
+                val imgW    = with(density) { bounds.width.toDp() }
+                val imgH    = with(density) { bounds.height.toDp() }
+
+                Box(
+                    modifier = Modifier
+                        .absoluteOffset(x = offsetX, y = offsetY)
+                        .size(width = imgW, height = imgH)
+                        .clipToBounds()
+                ) {
+                    // Foto
+                    if (bitmap != null) {
+                        Image(
+                            bitmap             = bitmap.asImageBitmap(),
+                            contentDescription = null,
+                            modifier           = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    rotationZ = totalAngle
+                                    scaleX    = autoScale * rotationFitScale * if (editState.flipHorizontal) -1f else 1f
+                                    scaleY    = autoScale * rotationFitScale
+                                }
+                        )
+                    }
+
+                    // Overlay crop
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    ) {
+                        val crop = cropPxState.value
+                            ?: Rect(0f, 0f, size.width, size.height)
+
+                        drawRect(color = Color.Black.copy(alpha = 0.45f))
+                        drawRect(
+                            color     = Color.Transparent,
+                            topLeft   = Offset(crop.left, crop.top),
+                            size      = Size(crop.width, crop.height),
+                            blendMode = BlendMode.Clear
+                        )
+                        drawRect(
+                            color   = Color.White,
+                            topLeft = Offset(crop.left, crop.top),
+                            size    = Size(crop.width, crop.height),
+                            style   = Stroke(width = 2.dp.toPx())
+                        )
+                        val tw = crop.width  / 3f
+                        val th = crop.height / 3f
+                        for (i in 1..2) {
+                            drawLine(
+                                Color.White.copy(alpha = 0.4f),
+                                Offset(crop.left + tw * i, crop.top),
+                                Offset(crop.left + tw * i, crop.bottom),
+                                1.dp.toPx()
+                            )
+                            drawLine(
+                                Color.White.copy(alpha = 0.4f),
+                                Offset(crop.left,  crop.top + th * i),
+                                Offset(crop.right, crop.top + th * i),
+                                1.dp.toPx()
+                            )
                         }
-                )
-            }
-
-            // Overlay crop — Canvas con graphicsLayer per abilitare BlendMode.Clear
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            ) {
-                val crop = cropPxState.value
-                    ?: Rect(0f, 0f, size.width, size.height)
-
-                // Oscura tutto il frame
-                drawRect(color = Color.Black.copy(alpha = 0.45f))
-                // Buca trasparente sull'area di crop
-                drawRect(
-                    color     = Color.Transparent,
-                    topLeft   = Offset(crop.left, crop.top),
-                    size      = Size(crop.width, crop.height),
-                    blendMode = BlendMode.Clear
-                )
-                // Bordo bianco
-                drawRect(
-                    color   = Color.White,
-                    topLeft = Offset(crop.left, crop.top),
-                    size    = Size(crop.width, crop.height),
-                    style   = Stroke(width = 2.dp.toPx())
-                )
-                // Griglia 3×3
-                val tw = crop.width  / 3f
-                val th = crop.height / 3f
-                for (i in 1..2) {
-                    drawLine(
-                        Color.White.copy(alpha = 0.4f),
-                        Offset(crop.left + tw * i, crop.top),
-                        Offset(crop.left + tw * i, crop.bottom),
-                        1.dp.toPx()
-                    )
-                    drawLine(
-                        Color.White.copy(alpha = 0.4f),
-                        Offset(crop.left,  crop.top + th * i),
-                        Offset(crop.right, crop.top + th * i),
-                        1.dp.toPx()
-                    )
+                        drawCropHandles(crop)
+                    }
                 }
-                drawCropHandles(crop, handlePx * 0.55f)
             }
         }
 
         // ── Slider rotazione ──────────────────────────────────────
         Text(
-            "Angle ${editState.angleDeg.toInt()}°",
-            fontSize   = 14.sp,
+            text       = "Angle ${editState.angleDeg.toInt()}°",
+            fontSize   = 16.sp,
             fontFamily = robotoRegular,
-            color      = Color.Black.copy(alpha = 0.6f),
+            color      = lavLightColor,
             modifier   = Modifier.padding(top = 8.dp)
         )
         Slider(
             value         = editState.angleDeg,
-            onValueChange = onAngleChanged,
+            onValueChange = { newAngle -> onAngleChanged(newAngle) },
             valueRange    = -45f..45f,
             modifier      = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp),
-            colors        = SliderDefaults.colors(
-                thumbColor         = lavLight,
-                activeTrackColor   = lavLight,
+            colors = SliderDefaults.colors(
+                thumbColor         = lavLightColor,
+                activeTrackColor   = lavLightColor,
                 inactiveTrackColor = lavLightTrasl
             )
         )
@@ -453,21 +497,24 @@ private fun CropRotateTool(
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-private fun DrawScope.drawCropHandles(rect: Rect, r: Float) {
-    listOf(
-        Offset(rect.left,  rect.top),
-        Offset(rect.right, rect.top),
-        Offset(rect.left,  rect.bottom),
-        Offset(rect.right, rect.bottom)
-    ).forEach { c ->
-        drawRect(Color.White,
-            topLeft = Offset(c.x - r, c.y - r),
-            size    = Size(r * 2f, r * 2f))
-        drawRect(Color(0xFF1E88E5),
-            topLeft = Offset(c.x - r, c.y - r),
-            size    = Size(r * 2f, r * 2f),
-            style   = Stroke(width = 2.5.dp.toPx()))
-    }
+
+private fun DrawScope.drawCropHandles(rect: Rect) {
+    val l = 22.dp.toPx()
+    val s =  4.dp.toPx()
+    val o =  3.dp.toPx()
+
+    // TOP LEFT
+    drawLine(Color.White, Offset(rect.left + o, rect.top + o),    Offset(rect.left + l, rect.top + o),    s)
+    drawLine(Color.White, Offset(rect.left + o, rect.top + o),    Offset(rect.left + o, rect.top + l),    s)
+    // TOP RIGHT
+    drawLine(Color.White, Offset(rect.right - l, rect.top + o),   Offset(rect.right - o, rect.top + o),   s)
+    drawLine(Color.White, Offset(rect.right - o, rect.top + o),   Offset(rect.right - o, rect.top + l),   s)
+    // BOTTOM LEFT
+    drawLine(Color.White, Offset(rect.left + o, rect.bottom - o), Offset(rect.left + l, rect.bottom - o), s)
+    drawLine(Color.White, Offset(rect.left + o, rect.bottom - l), Offset(rect.left + o, rect.bottom - o), s)
+    // BOTTOM RIGHT
+    drawLine(Color.White, Offset(rect.right - l, rect.bottom - o), Offset(rect.right - o, rect.bottom - o), s)
+    drawLine(Color.White, Offset(rect.right - o, rect.bottom - l), Offset(rect.right - o, rect.bottom - o), s)
 }
 
 private fun hitTestHandle(offset: Offset, rect: Rect, radius: Float): String? =
@@ -491,52 +538,39 @@ internal fun applyEdits(
 ): Bitmap? {
     original ?: return null
 
-    val angleRad  = Math.toRadians(abs(angleDeg).toDouble())
-    val cosA      = kotlin.math.abs(kotlin.math.cos(angleRad)).toFloat()
-    val sinA      = kotlin.math.abs(kotlin.math.sin(angleRad)).toFloat()
-    val autoScale = cosA + sinA
+    val angleRad   = Math.toRadians(abs(angleDeg).toDouble())
+    val cosA       = kotlin.math.abs(kotlin.math.cos(angleRad)).toFloat()
+    val sinA       = kotlin.math.abs(kotlin.math.sin(angleRad)).toFloat()
+    val autoScale  = cosA + sinA
     val totalAngle = angleDeg - rotate90Count * 90f
 
-    // ── 1. Calcola il "frame" virtuale (come ContentScale.Fit) ──────────
-    //    Scegliamo una dimensione di frame coerente con le proporzioni del bitmap.
-    //    Usiamo le dimensioni del bitmap come riferimento (non serve un frame fisico).
     val bmpW = original.width.toFloat()
     val bmpH = original.height.toFloat()
 
-    // Il frame virtuale ha le stesse proporzioni del bitmap originale.
-    // "Fit" significa che il bitmap riempie il frame senza tagliare nulla.
-    // Quindi frame == bitmap (scala 1:1) — è il caso più semplice.
-    // autoScale poi ingrandisce il bitmap ruotato per riempire il frame.
-
-    // ── 2. Crea un canvas della dimensione del frame (= bitmap originale) ─
-    //    e disegna il bitmap ruotato+scalato centrato.
-    val frameW = bmpW.toInt()
-    val frameH = bmpH.toInt()
+    // FIX rotate90: se il conteggio è dispari, il frame di output è trasposto
+    val isTransposed = rotate90Count % 2 != 0
+    val frameW = if (isTransposed) bmpH.toInt() else bmpW.toInt()
+    val frameH = if (isTransposed) bmpW.toInt() else bmpH.toInt()
 
     val result = Bitmap.createBitmap(frameW, frameH, Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(result)
 
     val matrix = Matrix()
-    // Prima scala con autoScale attorno al centro del frame
+    // Trasla il bitmap al centro del frame di output (che può avere dimensioni diverse)
+    matrix.postTranslate((frameW - bmpW) / 2f, (frameH - bmpH) / 2f)
     matrix.postScale(
         autoScale * if (flipH) -1f else 1f,
         autoScale,
-        bmpW / 2f,
-        bmpH / 2f
+        frameW / 2f,
+        frameH / 2f
     )
-    // Poi ruota attorno al centro del frame
-    matrix.postRotate(totalAngle, bmpW / 2f, bmpH / 2f)
-
+    matrix.postRotate(totalAngle, frameW / 2f, frameH / 2f)
     canvas.drawBitmap(original, matrix, null)
 
-    // ── 3. Crop in coordinate-frame ──────────────────────────────────────
-    //    cropRect [0..1] è relativo al frame → moltiplichiamo per frameW/H
     val x = (cropRect.left   * frameW).toInt().coerceIn(0, frameW - 1)
     val y = (cropRect.top    * frameH).toInt().coerceIn(0, frameH - 1)
-    val w = (cropRect.width  * frameW).toInt()
-        .coerceAtLeast(1).coerceAtMost(frameW - x)
-    val h = (cropRect.height * frameH).toInt()
-        .coerceAtLeast(1).coerceAtMost(frameH - y)
+    val w = (cropRect.width  * frameW).toInt().coerceAtLeast(1).coerceAtMost(frameW - x)
+    val h = (cropRect.height * frameH).toInt().coerceAtLeast(1).coerceAtMost(frameH - y)
 
     return Bitmap.createBitmap(result, x, y, w, h)
 }

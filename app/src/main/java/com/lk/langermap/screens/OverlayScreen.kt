@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -60,14 +61,12 @@ fun OverlayScreen(
     var opacity       by remember { mutableFloatStateOf(initialOpacity) }
     var selectedColor by remember { mutableStateOf(initialColor) }
 
-    // ── DIMENSIONI REALI DELLA BOX (pixel fisici) ─────────────────
     var boxWidthPx  by remember { mutableIntStateOf(0) }
     var boxHeightPx by remember { mutableIntStateOf(0) }
 
     val context        = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // ── COMPOSIZIONE BITMAP ──────────────────────────────────────
     fun composeBitmap(onReady: (Uri) -> Unit) {
         val bw: Int = boxWidthPx
         val bh: Int = boxHeightPx
@@ -134,7 +133,6 @@ fun OverlayScreen(
         }
     }
 
-    // ── STORICO PER UNDO ─────────────────────────────────────────
     data class Snapshot(
         val ox: Float, val oy: Float, val sc: Float,
         val rot: Float, val op: Float, val col: Color
@@ -206,14 +204,14 @@ fun OverlayScreen(
         Text(
             text = "Correctly adapt the lines to the image",
             fontSize = 13.sp,
+            textAlign = TextAlign.Center,
             color = Color.Gray,
             modifier = Modifier
                 .padding(start = 16.dp, bottom = 12.dp)
+                .fillMaxWidth()
         )
 
         // ── CANVAS: FOTO + OVERLAY ────────────────────────────────
-        // weight(1f) fa occupare tutto lo spazio disponibile tra subtitle e settings;
-        // i padding top/bottom creano il margine visivo richiesto.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -233,7 +231,6 @@ fun OverlayScreen(
                     boxHeightPx = size.height
                 }
         ) {
-            // LAYER 1 — Foto (ContentScale.Fit per rispettare le proporzioni originali)
             if (photoUri.isNotEmpty()) {
                 AsyncImage(
                     model = Uri.parse(photoUri),
@@ -243,7 +240,6 @@ fun OverlayScreen(
                 )
             }
 
-            // LAYER 2 — Linee di Langer sopra la foto
             Image(
                 painter = painterResource(id = overlayRes),
                 contentDescription = "Linee di Langer",
@@ -272,29 +268,21 @@ fun OverlayScreen(
         // ── DIVIDER ───────────────────────────────────────────────
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
-            HorizontalDivider(
-                modifier = Modifier.weight(1f),
-                color = colorResource(id = R.color.lav_light_trasl)
-            )
+            HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light))
             Text(
                 text = "more overlay settings",
                 fontSize = 12.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
-            HorizontalDivider(
-                modifier = Modifier.weight(1f),
-                color = colorResource(id = R.color.lav_light_trasl)
-            )
+            HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light))
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ── PANNELLO SETTINGS ─────────────────────────────────────
+        // ── PANNELLO SETTINGS (rotation + opacity + color + undo/reset) ──
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -378,45 +366,54 @@ fun OverlayScreen(
                     Spacer(modifier = Modifier.width(4.dp))
                 }
             }
+
+            // ── UNDO / RESET ─────────────────────────────────────
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Button(
+                    onClick = { undo() },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.55f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_undo),
+                        contentDescription = null,
+                        tint = black,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Undo", color = black)
+                }
+                Button(
+                    onClick = {
+                        history.clear()
+                        offsetX = 0f; offsetY = 0f
+                        scale = 1f; rotation = 0f
+                        opacity = 0.75f; selectedColor = Color.Black
+                        onStateChanged(0f, 0f, 1f, 0f, 0.75f, Color.Black)
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.55f)
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_reset),
+                        contentDescription = null,
+                        tint = black
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Reset", color = black)
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // ── UNDO / RESET ──────────────────────────────────────────
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = { undo() },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(painter = painterResource(id = R.drawable.ic_undo), contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Undo", color = Color.DarkGray)
-            }
-            Button(
-                onClick = {
-                    history.clear()
-                    offsetX = 0f; offsetY = 0f
-                    scale = 1f; rotation = 0f
-                    opacity = 0.75f; selectedColor = Color.Black
-                    onStateChanged(0f, 0f, 1f, 0f, 0.75f, Color.Black)
-                },
-                modifier = Modifier.weight(1f),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Icon(painter = painterResource(id = R.drawable.ic_reset), contentDescription = null)
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Reset", color = Color.DarkGray)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(59.dp))
     }
 }

@@ -22,6 +22,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -80,6 +81,7 @@ fun Modifier.topShadow(
         )
     }
 }
+
 @Composable
 fun RegionScreen(
     sex: String,
@@ -90,13 +92,14 @@ fun RegionScreen(
 ) {
     var selectedPov by remember { mutableStateOf(initialPov) }
     var selectedRegion by remember { mutableStateOf(initialRegion) }
+
     val regionDrawableMap = if (sex.lowercase() == "male") {
         mapOf(
             R.string.forehead to R.drawable.langer_forehead,
             R.string.cheek    to R.drawable.langer_cheek,
             R.string.chest    to R.drawable.langer_male_chest,
             R.string.abdomen  to R.drawable.langer_male_abdomen,
-            R.string.back  to R.drawable.langer_male_back,
+            R.string.back     to R.drawable.langer_male_back,
             R.string.arm      to if (selectedPov == "front") R.drawable.langer_male_arm_front else R.drawable.langer_male_arm_back,
             R.string.leg      to if (selectedPov == "front") R.drawable.langer_male_leg_front else R.drawable.langer_male_leg_back
         )
@@ -106,7 +109,7 @@ fun RegionScreen(
             R.string.cheek    to R.drawable.langer_cheek,
             R.string.chest    to R.drawable.langer_female_chest,
             R.string.abdomen  to R.drawable.langer_female_abdomen,
-            R.string.back  to R.drawable.langer_female_back,
+            R.string.back     to R.drawable.langer_female_back,
             R.string.arm      to if (selectedPov == "front") R.drawable.langer_female_arm_front else R.drawable.langer_female_arm_back,
             R.string.leg      to if (selectedPov == "front") R.drawable.langer_female_leg_front else R.drawable.langer_female_leg_back
         )
@@ -114,13 +117,22 @@ fun RegionScreen(
 
     val regionNames = mapOf(
         R.string.forehead to stringResource(R.string.forehead),
-        R.string.cheek to stringResource(R.string.cheek),
-        R.string.chest to stringResource(R.string.chest),
-        R.string.abdomen to stringResource(R.string.abdomen),
-        R.string.arm to stringResource(R.string.arm),
-        R.string.leg to stringResource(R.string.leg),
-        R.string.back to stringResource(R.string.back)
+        R.string.cheek    to stringResource(R.string.cheek),
+        R.string.chest    to stringResource(R.string.chest),
+        R.string.abdomen  to stringResource(R.string.abdomen),
+        R.string.arm      to stringResource(R.string.arm),
+        R.string.leg      to stringResource(R.string.leg),
+        R.string.back     to stringResource(R.string.back)
     )
+
+    // Helper lambda reutilizzato sia nell'header che (se serve) altrove
+    val navigateIfReady: () -> Unit = {
+        selectedRegion?.let { region ->
+            val drawable   = regionDrawableMap[region] ?: 0
+            val regionName = regionNames[region] ?: ""
+            onNavigateToUpload(drawable, regionName, region, selectedPov)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -139,7 +151,8 @@ fun RegionScreen(
                 .align(Alignment.TopCenter)
         )
 
-        // Header
+        // ── HEADER ───────────────────────────────────────────────
+        // Struttura identica al riferimento:  BackArrow | Title | Next
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -149,43 +162,60 @@ fun RegionScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .height(56.dp)
+                    .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Freccia indietro
                 IconButton(onClick = onBack) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_back_arrow),
-                        contentDescription = "Back"
+                        contentDescription = "Back",
+                        tint = colorResource(id = R.color.b)
                     )
                 }
-                Image(
-                    painter = painterResource(id = R.drawable.logo_lm),
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp)
+
+                // Titolo (peso 1f = occupa tutto lo spazio residuo)
+                Text(
+                    text       = stringResource(id = R.string.choose_region),
+                    fontSize   = 20.sp,
+                    fontFamily = robotoSemiBold,
+                    color      = colorResource(id = R.color.b),
+                    modifier   = Modifier
+                        .weight(1f)
+                        .padding(start = 8.dp)
                 )
+
+                // Next in alto a destra — disabilitato finché nessuna region è selezionata
+                TextButton(
+                    onClick  = navigateIfReady,
+                    enabled  = selectedRegion != null
+                ) {
+                    Text(
+                        text     = stringResource(id = R.string.btn_next),
+                        color    = if (selectedRegion != null)
+                                       colorResource(id = R.color.teal)   // usa il tuo colore teal
+                                   else
+                                       colorResource(id = R.color.b).copy(alpha = 0.3f),
+                        fontSize = 16.sp,
+                        fontFamily = robotoSemiBold
+                    )
+                }
             }
 
+            // Sottotitolo sotto la riga header — centrato e spostato in basso nell'area teal
             Text(
-                text = stringResource(id = R.string.choose_region),
-                fontSize = 28.sp,
-                fontFamily = robotoSemiBold,
-                color = colorResource(id = R.color.b),
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 20.dp)
-            )
-
-            Text(
-                text = stringResource(id = R.string.choose_region_subtitle),
-                fontSize = 14.sp,
+                text       = stringResource(id = R.string.choose_region_subtitle),
+                fontSize   = 17.sp,
                 fontFamily = robotoRegular,
-                color = colorResource(id = R.color.b),
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 6.dp)
+                color      = colorResource(id = R.color.b),
+                textAlign  = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier   = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp, start = 16.dp, end = 16.dp)
             )
         }
+        // ── END HEADER ───────────────────────────────────────────
 
         // Card bianca in basso
         Column(
@@ -194,8 +224,8 @@ fun RegionScreen(
                 .fillMaxHeight(0.70f)
                 .align(Alignment.BottomCenter)
                 .topShadow(
-                    color = Color.Black.copy(alpha = 0.15f),
-                    blur = 12.dp,
+                    color   = Color.Black.copy(alpha = 0.15f),
+                    blur    = 12.dp,
                     offsetY = (-6).dp
                 )
                 .background(
@@ -218,6 +248,7 @@ fun RegionScreen(
             )
 
             Spacer(modifier = Modifier.height(24.dp))
+
             val scrollState = androidx.compose.foundation.rememberScrollState()
 
             Column(
@@ -239,24 +270,27 @@ fun RegionScreen(
 
                 regions.chunked(2).forEach { rowItems ->
                     if (rowItems.size == 1) {
+                        // Arrangement.Center + fillMaxWidth(0.44f):
+                        // i bottoni accoppiati prendono (rowWidth - 40dp) / 2 ≈ 44% di rowWidth.
+                        // Questo replica la stessa larghezza e centra il bottone.
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Button(
                                 onClick = { selectedRegion = rowItems[0] },
-                                colors = regionButtonColors(isSelected = selectedRegion == rowItems[0]),
-                                shape = regionButtonShape,
+                                colors  = regionButtonColors(isSelected = selectedRegion == rowItems[0]),
+                                shape   = regionButtonShape,
                                 modifier = Modifier
-                                    .fillMaxWidth(0.5f)
-                                    .height(90.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    .fillMaxWidth(0.44f)
+                                    .height(90.dp)
+                                    .padding(vertical = 8.dp)
                             ) {
                                 Text(
-                                    text = stringResource(id = rowItems[0]),
-                                    fontSize = 20.sp,
+                                    text     = stringResource(id = rowItems[0]),
+                                    fontSize = 15.sp,
                                     fontFamily = robotoRegular,
-                                    color = colorResource(id = R.color.b),
+                                    color    = colorResource(id = R.color.b),
                                     maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                 )
@@ -269,19 +303,20 @@ fun RegionScreen(
                         ) {
                             rowItems.forEach { stringRes ->
                                 Button(
-                                    onClick = { selectedRegion = stringRes },
-                                    colors = regionButtonColors(isSelected = selectedRegion == stringRes),
-                                    shape = regionButtonShape,
+                                    onClick  = { selectedRegion = stringRes },
+                                    colors   = regionButtonColors(isSelected = selectedRegion == stringRes),
+                                    shape    = regionButtonShape,
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(90.dp)
                                         .padding(vertical = 8.dp)
                                 ) {
                                     Text(
-                                        text = stringResource(id = stringRes),
-                                        fontSize = 20.sp,
+                                        text     = stringResource(id = stringRes),
+                                        // ── FIX 2: fontSize ridotto per non sforare ──
+                                        fontSize = 15.sp,
                                         fontFamily = robotoRegular,
-                                        color = colorResource(id = R.color.b),
+                                        color    = colorResource(id = R.color.b),
                                         maxLines = 1,
                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                     )
@@ -291,71 +326,46 @@ fun RegionScreen(
                     }
                 }
 
+                // ── FIX 4: POV radio affiancati in Row ───────────────
                 val showPov = selectedRegion == R.string.arm || selectedRegion == R.string.leg
                 if (showPov) {
-                    Column(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp),
-                        horizontalAlignment = Alignment.Start
+                            .padding(top = 8.dp, start = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedPov == "front",
-                                onClick = { selectedPov = "front" },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = colorResource(id = R.color.lav_light)
-                                )
+                        RadioButton(
+                            selected = selectedPov == "front",
+                            onClick  = { selectedPov = "front" },
+                            colors   = RadioButtonDefaults.colors(
+                                selectedColor = colorResource(id = R.color.lav_light)
                             )
-                            Text(
-                                text = "From front POV",
-                                fontFamily = robotoRegular,
-                                fontSize = 14.sp
+                        )
+                        Text(
+                            text       = "Front POV",
+                            fontFamily = robotoRegular,
+                            fontSize   = 14.sp
+                        )
+                        Spacer(modifier = Modifier.width(24.dp))
+                        RadioButton(
+                            selected = selectedPov == "back",
+                            onClick  = { selectedPov = "back" },
+                            colors   = RadioButtonDefaults.colors(
+                                selectedColor = colorResource(id = R.color.lav_light)
                             )
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = selectedPov == "back",
-                                onClick = { selectedPov = "back" },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = colorResource(id = R.color.lav_light)
-                                )
-                            )
-                            Text(
-                                text = "From back POV",
-                                fontFamily = robotoRegular,
-                                fontSize = 14.sp
-                            )
-                        }
+                        )
+                        Text(
+                            text       = "Back POV",
+                            fontFamily = robotoRegular,
+                            fontSize   = 14.sp
+                        )
                     }
                 }
+                // ── END FIX 4 ────────────────────────────────────────
 
+                // ── FIX 3: Next button RIMOSSO da qui (ora è nell'header) ──
                 Spacer(modifier = Modifier.height(24.dp))
-
-                // Bottone Next dentro lo scroll
-                Button(
-                    onClick = {
-                        selectedRegion?.let { region ->
-                            val drawable = regionDrawableMap[region] ?: 0
-                            val regionName = regionNames[region] ?: ""
-                            onNavigateToUpload(drawable, regionName, selectedRegion!!, selectedPov)
-                        }
-                    },
-                    enabled = selectedRegion != null,
-                    modifier = Modifier
-                        .width(117.dp)
-                        .height(50.dp),
-                    colors = nextButtonColors(),
-                    shape = nextButtonShape
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.btn_next),
-                        fontSize = 20.sp,
-                        fontFamily = robotoRegular
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(59.dp))
             }
         }
     }
