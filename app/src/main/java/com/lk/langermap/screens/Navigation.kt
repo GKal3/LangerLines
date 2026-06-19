@@ -105,6 +105,9 @@ fun Navigation(viewModel: AppViewModel) {
                 initialImageUri = viewModel.selectedImageUri,
                 onImageSelected = { uri: Uri? -> viewModel.selectedImageUri = uri },
                 onNavigateToSettings = { photoUriString ->
+                    // Reset editState ogni volta che si avvia una nuova sessione di edit
+                    // (nuova foto scelta), così non restano modifiche vecchie
+                    viewModel.editState = EditState()
                     val encoded = URLEncoder.encode(photoUriString, "UTF-8")
                     navController.navigate("edit/$encoded/$drawableResId")
                 },
@@ -149,14 +152,16 @@ fun Navigation(viewModel: AppViewModel) {
             val drawableResId = backStackEntry.arguments?.getInt("regionDrawableResId") ?: 0
 
             EditPhotoScreen(
-                photoUri = photoUri,
-                onBack   = { navController.popBackStack() },
-                onApply  = { editedBitmap ->
+                photoUri          = photoUri,
+                initialEditState  = viewModel.editState,              // ← passa stato salvato
+                onEditStateChanged = { viewModel.editState = it },    // ← persiste ogni modifica
+                onBack            = { navController.popBackStack() },
+                onApply           = { editedBitmap ->
                     val savedUri = BitmapUtils.saveBitmapToCache(editedBitmap, context)
                     val encoded  = URLEncoder.encode(savedUri.toString(), "UTF-8")
-                    navController.navigate("overlay/$encoded/$drawableResId") {
-                        popUpTo("edit/{photoUri}/{regionDrawableResId}") { inclusive = true }
-                    }
+                    // ← RIMOSSO popUpTo: "edit" rimane nello stack di navigazione,
+                    //   così il tasto back da overlay torna qui (con le modifiche salvate)
+                    navController.navigate("overlay/$encoded/$drawableResId")
                 }
             )
         }

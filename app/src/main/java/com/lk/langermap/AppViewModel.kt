@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import android.net.Uri
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import com.lk.langermap.screens.EditState
 
 class AppViewModel : ViewModel() {
     var selectedSex by mutableStateOf<String?>(null)
@@ -21,4 +22,6 @@ class AppViewModel : ViewModel() {
     var overlayRotation by mutableFloatStateOf(0f)
     var overlayOpacity by mutableStateOf(0.75f)
     var overlayColor by mutableStateOf(androidx.compose.ui.graphics.Color.Black)
+
+    var editState: EditState = EditState()
 }
