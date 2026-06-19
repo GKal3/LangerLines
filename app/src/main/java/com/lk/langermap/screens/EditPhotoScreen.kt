@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -52,11 +53,7 @@ data class EditState(
     val flipHorizontal: Boolean = false
 )
 
-/**
- * Trasforma il rettangolo di crop (normalizzato 0..1) per tenerlo coerente
- * con una rotazione di 90° in senso antiorario del frame (la stessa rotazione
- * applicata dal pulsante "Rotate90": totalAngle += -90°).
- */
+
 private fun rotateCropRect90(r: Rect): Rect = Rect(
     left   = r.top,
     top    = 1f - r.right,
@@ -68,19 +65,17 @@ private fun rotateCropRect90(r: Rect): Rect = Rect(
 @Composable
 fun EditPhotoScreen(
     photoUri: Uri = Uri.EMPTY,
-    initialEditState: EditState = EditState(),          // ← NUOVO: stato iniziale salvato
-    onEditStateChanged: (EditState) -> Unit = {},       // ← NUOVO: callback per persistere
+    initialEditState: EditState = EditState(),
+    onEditStateChanged: (EditState) -> Unit = {},
     onBack: () -> Unit = {},
     onApply: (Bitmap?) -> Unit = {}
 ) {
     val context = LocalContext.current
 
-    // Inizializza con lo stato salvato (es. quando si torna indietro da overlay)
     var editState      by remember { mutableStateOf(initialEditState) }
     var originalBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var previewBitmap  by remember { mutableStateOf<Bitmap?>(null) }
 
-    // Helper per aggiornare editState e notificare il viewModel in un colpo solo
     fun updateEdit(new: EditState) {
         editState = new
         onEditStateChanged(new)
@@ -91,8 +86,6 @@ fun EditPhotoScreen(
             val full = withContext(Dispatchers.IO) { loadBitmapFromUri(context, photoUri) }
             originalBitmap = full
             previewBitmap  = withContext(Dispatchers.IO) { scaledForPreview(full) }
-            // NON resettiamo editState qui: lo stato salvato (initialEditState)
-            // viene già usato come valore iniziale di remember{}
         }
     }
 
@@ -126,6 +119,7 @@ fun EditPhotoScreen(
             }
             Text(
                 text       = "Edit patient's photo",
+                textAlign = TextAlign.Center,
                 fontSize   = 18.sp,
                 fontFamily = robotoSemiBold,
                 color      = black,
@@ -140,7 +134,7 @@ fun EditPhotoScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ── TOOLBAR: Flip + Rotate90 (sx) — Reset (dx) ────────────
+        // ── TOOLBAR ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -187,10 +181,10 @@ fun EditPhotoScreen(
 
             OutlinedButton(
                 onClick = { updateEdit(EditState()) },
-                shape  = RoundedCornerShape(20.dp),
+                shape  = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor   = black,
-                    containerColor = white
+                    containerColor = lavLightTrasl
                 )
             ) {
                 Icon(
@@ -225,7 +219,6 @@ fun EditPhotoScreen(
     }
 }
 
-// ─── Preview scaling ──────────────────────────────────────────────────────────
 internal fun scaledForPreview(bitmap: Bitmap?): Bitmap? {
     bitmap ?: return null
     val maxSide = maxOf(bitmap.width, bitmap.height)
@@ -236,7 +229,6 @@ internal fun scaledForPreview(bitmap: Bitmap?): Bitmap? {
     return Bitmap.createScaledBitmap(bitmap, w, h, true)
 }
 
-// ─── Rettangolo della foto in coordinate del Box (ContentScale.Fit) ───────────
 private fun fitRect(boxW: Float, boxH: Float, imgW: Float, imgH: Float): Rect {
     if (boxW <= 0f || boxH <= 0f || imgW <= 0f || imgH <= 0f) return Rect(0f, 0f, boxW, boxH)
     val scale = minOf(boxW / imgW, boxH / imgH)
@@ -247,7 +239,6 @@ private fun fitRect(boxW: Float, boxH: Float, imgW: Float, imgH: Float): Rect {
     return Rect(left, top, left + w, top + h)
 }
 
-// ─── CROP + ROTATE TOOL ───────────────────────────────────────────────────────
 @Composable
 private fun CropRotateTool(
     bitmap: Bitmap?,
@@ -482,8 +473,6 @@ private fun CropRotateTool(
     }
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 private fun DrawScope.drawCropHandles(rect: Rect) {
     val l = 22.dp.toPx()
     val s =  4.dp.toPx()
@@ -510,7 +499,6 @@ private fun hitTestHandle(offset: Offset, rect: Rect, radius: Float): String? =
                 offset.y in (c.y - radius)..(c.y + radius)
     }?.key
 
-// ─── Apply all edits to original bitmap ──────────────────────────────────────
 internal fun applyEdits(
     original: Bitmap?,
     cropRect: Rect,

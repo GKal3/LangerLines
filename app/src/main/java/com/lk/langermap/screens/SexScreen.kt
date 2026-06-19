@@ -20,9 +20,6 @@ import com.lk.langermap.R
 import com.lk.langermap.ui.theme.*
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.DisposableEffect
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.Lifecycle
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview(showBackground = true)
@@ -33,7 +30,6 @@ fun SexScreen(
 ) {
     var selectedSex by remember { mutableStateOf(initialSex) }
     var expanded by remember { mutableStateOf(false) }
-    //var selectedSex by remember { mutableStateOf<String?>(null) }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -57,7 +53,7 @@ fun SexScreen(
             .statusBarsPadding()
     ) {
 
-        // Gradient background
+        // ── GRADIENT ───────────────────────────────────────────────
         Image(
             painter = painterResource(id = R.drawable.gradient1),
             contentDescription = null,
@@ -68,7 +64,7 @@ fun SexScreen(
                 .align(Alignment.TopCenter)
         )
 
-        // Header
+        // ── HEADER ───────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -99,7 +95,7 @@ fun SexScreen(
             )
         }
 
-        // Card bianca
+        // ── WHITE CARD ───────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -118,7 +114,7 @@ fun SexScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // Drag handle
+            // ── DRAG HANDLE ───────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .width(199.dp)
@@ -131,7 +127,7 @@ fun SexScreen(
 
             Spacer(modifier = Modifier.height(137.dp))
 
-            // Dropdown
+            // ── DROPDOWN ───────────────────────────────────────────────
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded },

@@ -22,12 +22,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -38,6 +39,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
+import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
 
 @Preview
 @Composable
@@ -54,18 +57,44 @@ fun OverlayScreen(
     onBack: () -> Unit = {},
     onFinish: (String) -> Unit = {}
 ) {
-    var offsetX       by remember { mutableFloatStateOf(initialOffsetX) }
-    var offsetY       by remember { mutableFloatStateOf(initialOffsetY) }
-    var scale         by remember { mutableFloatStateOf(initialScale) }
-    var rotation      by remember { mutableFloatStateOf(initialRotation) }
-    var opacity       by remember { mutableFloatStateOf(initialOpacity) }
+    var offsetX by remember { mutableFloatStateOf(initialOffsetX) }
+    var offsetY by remember { mutableFloatStateOf(initialOffsetY) }
+    var scale by remember { mutableFloatStateOf(initialScale) }
+    var rotation by remember { mutableFloatStateOf(initialRotation) }
+    var opacity by remember { mutableFloatStateOf(initialOpacity) }
     var selectedColor by remember { mutableStateOf(initialColor) }
 
     var boxWidthPx  by remember { mutableIntStateOf(0) }
     var boxHeightPx by remember { mutableIntStateOf(0) }
 
+    var photoIntrinsicSize by remember { mutableStateOf<IntSize?>(null) }
+
     val context        = LocalContext.current
+    val density        = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
+
+    val photoRect by remember(boxWidthPx, boxHeightPx, photoIntrinsicSize) {
+        derivedStateOf {
+            val intrinsic = photoIntrinsicSize
+            if (boxWidthPx == 0 || boxHeightPx == 0 || intrinsic == null) {
+                null
+            } else {
+                val wBox = boxWidthPx.toFloat()
+                val hBox = boxHeightPx.toFloat()
+                val wBmp = intrinsic.width.toFloat()
+                val hBmp = intrinsic.height.toFloat()
+
+                val fitScale = minOf(wBox / wBmp, hBox / hBmp)
+
+                val fittedW = wBmp * fitScale
+                val fittedH = hBmp * fitScale
+                val left = (wBox - fittedW) / 2f
+                val top  = (hBox - fittedH) / 2f
+
+                PhotoRect(left, top, fittedW, fittedH, fitScale)
+            }
+        }
+    }
 
     fun composeBitmap(onReady: (Uri) -> Unit) {
         val bw: Int = boxWidthPx
@@ -80,7 +109,7 @@ fun OverlayScreen(
         val capturedColor    : Color = selectedColor
 
         coroutineScope.launch(Dispatchers.IO) {
-            val photoBitmap = BitmapUtils.loadBitmapFromUri(context, Uri.parse(photoUri))
+            val photoBitmap = BitmapUtils.loadBitmapFromUri(context, photoUri.toUri())
                 ?: return@launch
             val overlayBitmap = android.graphics.BitmapFactory.decodeResource(
                 context.resources, overlayRes
@@ -93,17 +122,16 @@ fun OverlayScreen(
             val wOv : Float = overlayBitmap.width.toFloat()
             val hOv : Float = overlayBitmap.height.toFloat()
 
-            val cropScale: Float  = maxOf(wBox / wBmp, hBox / hBmp)
-            val fitScaleBox: Float = minOf(wBox / wOv, hBox / hOv)
-            val fitScaleBmp: Float = fitScaleBox / cropScale
+            val fitScaleBmpToBox: Float = minOf(wBox / wBmp, hBox / hBmp)
+
+            val fitScaleOvToBox: Float = minOf(wBox / wOv, hBox / hOv)
+
+            val fitScaleOvToBmp: Float = fitScaleOvToBox / fitScaleBmpToBox
 
             val cxBmp: Float = wBmp / 2f
             val cyBmp: Float = hBmp / 2f
 
-            val result = android.graphics.Bitmap.createBitmap(
-                photoBitmap.width, photoBitmap.height,
-                android.graphics.Bitmap.Config.ARGB_8888
-            )
+            val result = createBitmap(photoBitmap.width, photoBitmap.height)
             val canvas = android.graphics.Canvas(result)
             canvas.drawBitmap(photoBitmap, 0f, 0f, null)
 
@@ -116,15 +144,16 @@ fun OverlayScreen(
             }
 
             val matrix = android.graphics.Matrix()
-            matrix.setScale(fitScaleBmp, fitScaleBmp)
-            val scaledOvW = wOv * fitScaleBmp
-            val scaledOvH = hOv * fitScaleBmp
+            matrix.setScale(fitScaleOvToBmp, fitScaleOvToBmp)
+            val scaledOvW = wOv * fitScaleOvToBmp
+            val scaledOvH = hOv * fitScaleOvToBmp
             matrix.postTranslate((wBmp - scaledOvW) / 2f, (hBmp - scaledOvH) / 2f)
             matrix.postTranslate(-cxBmp, -cyBmp)
             matrix.postScale(capturedScale, capturedScale)
             matrix.postRotate(capturedRotation)
             matrix.postTranslate(cxBmp, cyBmp)
-            matrix.postTranslate(capturedOffsetX / cropScale, capturedOffsetY / cropScale)
+
+            matrix.postTranslate(capturedOffsetX / fitScaleBmpToBox, capturedOffsetY / fitScaleBmpToBox)
 
             canvas.drawBitmap(overlayBitmap, matrix, paint)
 
@@ -182,6 +211,7 @@ fun OverlayScreen(
             }
             Text(
                 text = "Overlay Langer's lines",
+                textAlign = TextAlign.Center,
                 fontSize = 18.sp,
                 fontFamily = robotoSemiBold,
                 color = black,
@@ -201,31 +231,28 @@ fun OverlayScreen(
         }
 
         // ── SUBTITLE ──────────────────────────────────────────────
-        Text(
-            text = "Correctly adapt the lines to the image",
-            fontSize = 13.sp,
-            textAlign = TextAlign.Center,
-            color = Color.Gray,
+        Row (
             modifier = Modifier
-                .padding(start = 16.dp, bottom = 12.dp)
-                .fillMaxWidth()
-        )
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text       = "Correctly adapt the lines to the image",
+                textAlign = TextAlign.Center,
+                color = Color.Gray,
+                fontSize   = 18.sp,
+                fontFamily = robotoSemiBold,
+                modifier   = Modifier
+                    .fillMaxWidth()
+            )
+        }
 
-        // ── CANVAS: FOTO + OVERLAY ────────────────────────────────
+        // ── CANVAS ───────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(horizontal = 16.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .border(
-                    width = 1.dp,
-                    color = colorResource(id = R.color.lav_light_trasl),
-                    shape = RoundedCornerShape(16.dp)
-                )
-                .background(
-                    colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.1f)
-                )
                 .onSizeChanged { size ->
                     boxWidthPx  = size.width
                     boxHeightPx = size.height
@@ -236,7 +263,31 @@ fun OverlayScreen(
                     model = Uri.parse(photoUri),
                     contentDescription = "Foto paziente",
                     contentScale = ContentScale.Fit,
+                    onSuccess = { state ->
+                        val drawable = state.result.drawable
+                        photoIntrinsicSize = IntSize(
+                            drawable.intrinsicWidth,
+                            drawable.intrinsicHeight
+                        )
+                    },
                     modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            photoRect?.let { rect ->
+                val leftDp   = with(density) { rect.left.toDp() }
+                val topDp    = with(density) { rect.top.toDp() }
+                val widthDp  = with(density) { rect.width.toDp() }
+                val heightDp = with(density) { rect.height.toDp() }
+
+                Box(
+                    modifier = Modifier
+                        .offset(x = leftDp, y = topDp)
+                        .size(widthDp, heightDp)
+                        .border(
+                            width = 1.dp,
+                            color = colorResource(id = R.color.lav_light_trasl)
+                        )
                 )
             }
 
@@ -282,7 +333,7 @@ fun OverlayScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // ── PANNELLO SETTINGS (rotation + opacity + color + undo/reset) ──
+        // ── SETTINGS ───────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -294,7 +345,7 @@ fun OverlayScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Rotation slider
+            // ── ROTATION SLIDER ───────────────────────────────────────────────
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_rotation),
@@ -315,7 +366,7 @@ fun OverlayScreen(
                 )
             }
 
-            // Opacity slider
+            // ── OPACITY SLIDER ───────────────────────────────────────────────
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     painter = painterResource(id = R.drawable.ic_opacity),
@@ -336,7 +387,7 @@ fun OverlayScreen(
                 )
             }
 
-            // Color picker
+            // ── COLOR PICK ───────────────────────────────────────────────
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -348,7 +399,7 @@ fun OverlayScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Color", fontSize = 14.sp, fontFamily = robotoRegular)
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(55.dp))
                 colorOptions.forEach { color ->
                     Box(
                         modifier = Modifier
@@ -367,53 +418,67 @@ fun OverlayScreen(
                 }
             }
 
-            // ── UNDO / RESET ─────────────────────────────────────
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // ── UNDO / RESET ─────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = { undo() },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.55f)
+                ),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Button(
-                    onClick = { undo() },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.55f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_undo),
-                        contentDescription = null,
-                        tint = black,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Undo", color = black)
-                }
-                Button(
-                    onClick = {
-                        history.clear()
-                        offsetX = 0f; offsetY = 0f
-                        scale = 1f; rotation = 0f
-                        opacity = 0.75f; selectedColor = Color.Black
-                        onStateChanged(0f, 0f, 1f, 0f, 0.75f, Color.Black)
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.55f)
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Icon(
-                        painter = painterResource(id = R.drawable.ic_reset),
-                        contentDescription = null,
-                        tint = black
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Reset", color = black)
-                }
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_undo),
+                    contentDescription = null,
+                    tint = black,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Undo", color = black)
+            }
+            Button(
+                onClick = {
+                    history.clear()
+                    offsetX = 0f; offsetY = 0f
+                    scale = 1f; rotation = 0f
+                    opacity = 0.75f; selectedColor = Color.Black
+                    onStateChanged(0f, 0f, 1f, 0f, 0.75f, Color.Black)
+                },
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorResource(id = R.color.lav_light_trasl).copy(alpha = 0.55f)
+                ),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_reset),
+                    contentDescription = null,
+                    tint = black,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Reset", color = black)
             }
         }
 
         Spacer(modifier = Modifier.height(59.dp))
     }
 }
+
+private data class PhotoRect(
+    val left: Float,
+    val top: Float,
+    val width: Float,
+    val height: Float,
+    val fitScale: Float
+)

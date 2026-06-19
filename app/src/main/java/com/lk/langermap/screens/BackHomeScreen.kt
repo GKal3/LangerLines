@@ -23,21 +23,37 @@ import com.lk.langermap.ui.theme.*
 @Preview
 @Composable
 fun BackHomeScreen(
+    onBack: () -> Unit = {},
     onStartNewProject: () -> Unit = {}
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colorResource(id = R.color.teal_light)),
-        contentAlignment = Alignment.Center
+            .background(colorResource(id = R.color.teal_light))
     ) {
+
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .statusBarsPadding()
+                .padding(start = 4.dp, top = 4.dp)
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_back_arrow),
+                contentDescription = "Back",
+                tint = Color.Black
+            )
+        }
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = 32.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp)
         ) {
 
-            // Icona check
             Icon(
                 painter = painterResource(id = R.drawable.ic_complete),
                 contentDescription = null,
@@ -47,7 +63,6 @@ fun BackHomeScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Titolo
             Text(
                 text = "Session complete",
                 fontSize = 32.sp,
@@ -57,7 +72,6 @@ fun BackHomeScreen(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Sottotitolo
             Text(
                 text = "The Langer's lines have been applied and saved. The image is ready for clinical use.",
                 fontSize = 16.sp,
@@ -68,7 +82,6 @@ fun BackHomeScreen(
 
             Spacer(modifier = Modifier.height(60.dp))
 
-            // Button Start a new project
             Button(
                 onClick = onStartNewProject,
                 modifier = Modifier
@@ -89,7 +102,6 @@ fun BackHomeScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Thank you
             Text(
                 text = buildAnnotatedString {
                     append("Thank you for using ")

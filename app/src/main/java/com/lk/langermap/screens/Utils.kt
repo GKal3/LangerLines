@@ -25,13 +25,10 @@ object BitmapUtils {
         }
     }
 
-
     fun loadBitmapFromUri(context: Context, uri: Uri): Bitmap? {
         if (uri == Uri.EMPTY) return null
         return try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                // API 28+: usa ImageDecoder (restituisce sempre un bitmap
-                // con config SOFTWARE, compatibile con Canvas)
                 val source = android.graphics.ImageDecoder.createSource(
                     context.contentResolver, uri
                 )
@@ -39,7 +36,6 @@ object BitmapUtils {
                     decoder.allocator = android.graphics.ImageDecoder.ALLOCATOR_SOFTWARE
                 }
             } else {
-                // API < 28: fallback con ContentResolver InputStream
                 @Suppress("DEPRECATION")
                 context.contentResolver.openInputStream(uri)?.use { stream ->
                     android.graphics.BitmapFactory.decodeStream(stream)

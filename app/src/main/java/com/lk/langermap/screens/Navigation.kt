@@ -28,7 +28,7 @@ fun Navigation(viewModel: AppViewModel) {
         popExitTransition = { ExitTransition.None }
     ) {
 
-        // HOME
+        // ── HOME ───────────────────────────────────────────────
         composable(
             "home",
             exitTransition = {
@@ -45,7 +45,7 @@ fun Navigation(viewModel: AppViewModel) {
             HomeScreen(onNavigateToRegion = { navController.navigate("sex") })
         }
 
-        // SEX
+        // ── SEX ───────────────────────────────────────────────
         composable(
             "sex",
             enterTransition = {
@@ -68,7 +68,7 @@ fun Navigation(viewModel: AppViewModel) {
             )
         }
 
-        // SELEZIONE REGIONE
+        // ── REGION ───────────────────────────────────────────────
         composable(
             route = "region/{sex}",
             arguments = listOf(navArgument("sex") { type = NavType.StringType })
@@ -87,7 +87,7 @@ fun Navigation(viewModel: AppViewModel) {
             )
         }
 
-        // UPLOAD
+        // ── UPLOAD ───────────────────────────────────────────────
         composable(
             route = "upload/{regionDrawableResId}/{region}",
             arguments = listOf(
@@ -122,7 +122,7 @@ fun Navigation(viewModel: AppViewModel) {
             )
         }
 
-        // FOTOCAMERA
+        // ── CAMERA ───────────────────────────────────────────────
         composable(
             route = "camera/{regionDrawableResId}",
             arguments = listOf(navArgument("regionDrawableResId") { type = NavType.IntType })
@@ -138,7 +138,7 @@ fun Navigation(viewModel: AppViewModel) {
             )
         }
 
-        // EDIT PHOTO (crop / rotate / mirror)
+        // ── EDIT PHOTO ───────────────────────────────────────────────
         composable(
             route = "edit/{photoUri}/{regionDrawableResId}",
             arguments = listOf(
@@ -166,7 +166,7 @@ fun Navigation(viewModel: AppViewModel) {
             )
         }
 
-        // OVERLAY
+        // ── OVERLAY ───────────────────────────────────────────────
         composable(
             route = "overlay/{photoUri}/{regionDrawableResId}",
             arguments = listOf(
@@ -202,10 +202,20 @@ fun Navigation(viewModel: AppViewModel) {
             )
         }
 
-        // OUTPUT
+        // ── OUTPUT ───────────────────────────────────────────────
         composable(
             route = "output/{photoUri}",
-            arguments = listOf(navArgument("photoUri") { type = NavType.StringType })
+            arguments = listOf(navArgument("photoUri") { type = NavType.StringType }),
+            exitTransition = {
+                if (targetState.destination.route == "backhome") {
+                    slideOutVertically(targetOffsetY = { -it }, animationSpec = tween(500))
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.destination.route == "backhome") {
+                    slideInVertically(initialOffsetY = { -it }, animationSpec = tween(500))
+                } else null
+            }
         ) { backStackEntry ->
             val encodedUri = backStackEntry.arguments?.getString("photoUri") ?: ""
             val photoUri   = URLDecoder.decode(encodedUri, "UTF-8")
@@ -213,16 +223,27 @@ fun Navigation(viewModel: AppViewModel) {
                 photoUri = photoUri,
                 onBack   = { navController.popBackStack() },
                 onNavigateToBackHome = {
-                    navController.navigate("backhome") {
-                        popUpTo("home") { inclusive = false }
-                    }
+                    navController.navigate("backhome")
                 }
             )
         }
 
-        // BACKHOME
-        composable("backhome") {
+        // ── BACKHOME ───────────────────────────────────────────────
+        composable(
+            "backhome",
+            enterTransition = {
+                if (initialState.destination.route == "output/{photoUri}") {
+                    slideInVertically(initialOffsetY = { it }, animationSpec = tween(500))
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.destination.route == "output/{photoUri}") {
+                    slideOutVertically(targetOffsetY = { it }, animationSpec = tween(500))
+                } else null
+            }
+        ) {
             BackHomeScreen(
+                onBack = { navController.popBackStack() },
                 onStartNewProject = {
                     navController.navigate("home") {
                         popUpTo("home") { inclusive = true }

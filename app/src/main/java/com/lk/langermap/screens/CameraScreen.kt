@@ -15,10 +15,8 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-//import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,7 +44,6 @@ fun CameraScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Stato permesso fotocamera
     var hasCameraPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
@@ -55,14 +52,12 @@ fun CameraScreen(
         )
     }
 
-    // Launcher per richiedere il permesso
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasCameraPermission = granted
     }
 
-    // Launcher per la galleria
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -71,11 +66,9 @@ fun CameraScreen(
         }
     }
 
-    // imageCapture viene inizializzato quando la camera parte
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     val executor = remember { Executors.newSingleThreadExecutor() }
 
-    // Richiedi permesso al primo avvio se non ce l'hai
     LaunchedEffect(Unit) {
         if (!hasCameraPermission) {
             permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -88,7 +81,7 @@ fun CameraScreen(
             .background(Color.Black)
     ) {
         if (hasCameraPermission) {
-            // ── PREVIEW FOTOCAMERA ────────────────────────────────
+            // ── PREVIEW CAMERA ────────────────────────────────
             CameraPreview(
                 modifier = Modifier.fillMaxSize(),
                 onImageCaptureReady = { capture ->
@@ -97,7 +90,6 @@ fun CameraScreen(
                 lifecycleOwner = lifecycleOwner
             )
         } else {
-            // ── MESSAGGIO PERMESSO NEGATO ─────────────────────────
             Column(
                 modifier = Modifier.align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -116,7 +108,7 @@ fun CameraScreen(
             }
         }
 
-        // ── BOTTONE BACK (in alto a sinistra) ─────────────────────
+        // ── BUTTON BACK ─────────────────────
         IconButton(
             onClick = onNavigateBack,
             modifier = Modifier
@@ -132,7 +124,6 @@ fun CameraScreen(
             )
         }
 
-        // ── BARRA INFERIORE ───────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -143,7 +134,6 @@ fun CameraScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
 
-            // Bottone galleria (sinistra)
             IconButton(
                 onClick = { galleryLauncher.launch("image/*") },
                 modifier = Modifier
@@ -158,7 +148,6 @@ fun CameraScreen(
                 //)
             }
 
-            // Bottone scatto (centro)
             Box(
                 modifier = Modifier
                     .size(72.dp)
@@ -206,15 +195,11 @@ fun CameraScreen(
                 }
             }
 
-            // Spazio bilanciamento (destra)
             Spacer(modifier = Modifier.size(52.dp))
         }
     }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// PREVIEW CAMERAX con AndroidView (bridge tra View e Compose)
-// ─────────────────────────────────────────────────────────────────
 @Composable
 private fun CameraPreview(
     modifier: Modifier = Modifier,
@@ -261,9 +246,6 @@ private fun CameraPreview(
     )
 }
 
-// ─────────────────────────────────────────────────────────────────
-// SCATTO FOTO
-// ─────────────────────────────────────────────────────────────────
 private fun takePhoto(
     context: Context,
     imageCapture: ImageCapture,
@@ -284,7 +266,6 @@ private fun takePhoto(
         object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                 val uri = output.savedUri ?: Uri.fromFile(photoFile)
-                // ← torna al main thread prima di navigare
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     onSuccess(uri)
                 }

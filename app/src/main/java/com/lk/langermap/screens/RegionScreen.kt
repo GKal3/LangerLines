@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +26,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -37,7 +34,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lk.langermap.R
-import com.lk.langermap.ui.theme.montserratSemiBold
 import com.lk.langermap.ui.theme.robotoRegular
 import com.lk.langermap.ui.theme.robotoSemiBold
 import androidx.compose.ui.draw.drawBehind
@@ -45,14 +41,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
-import com.lk.langermap.ui.theme.nextButtonColors
-import com.lk.langermap.ui.theme.nextButtonShape
 import com.lk.langermap.ui.theme.regionButtonColors
 import com.lk.langermap.ui.theme.regionButtonShape
 import androidx.compose.runtime.setValue
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.text.style.TextAlign
 
 fun Modifier.topShadow(
     color: Color = Color.Black.copy(alpha = 0.15f),
@@ -125,7 +121,6 @@ fun RegionScreen(
         R.string.back     to stringResource(R.string.back)
     )
 
-    // Helper lambda reutilizzato sia nell'header che (se serve) altrove
     val navigateIfReady: () -> Unit = {
         selectedRegion?.let { region ->
             val drawable   = regionDrawableMap[region] ?: 0
@@ -152,7 +147,6 @@ fun RegionScreen(
         )
 
         // ── HEADER ───────────────────────────────────────────────
-        // Struttura identica al riferimento:  BackArrow | Title | Next
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -166,7 +160,6 @@ fun RegionScreen(
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Freccia indietro
                 IconButton(onClick = onBack) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_back_arrow),
@@ -175,9 +168,9 @@ fun RegionScreen(
                     )
                 }
 
-                // Titolo (peso 1f = occupa tutto lo spazio residuo)
                 Text(
                     text       = stringResource(id = R.string.choose_region),
+                    textAlign = TextAlign.Center,
                     fontSize   = 20.sp,
                     fontFamily = robotoSemiBold,
                     color      = colorResource(id = R.color.b),
@@ -186,7 +179,6 @@ fun RegionScreen(
                         .padding(start = 8.dp)
                 )
 
-                // Next in alto a destra — disabilitato finché nessuna region è selezionata
                 TextButton(
                     onClick  = navigateIfReady,
                     enabled  = selectedRegion != null
@@ -194,7 +186,7 @@ fun RegionScreen(
                     Text(
                         text     = stringResource(id = R.string.btn_next),
                         color    = if (selectedRegion != null)
-                                       colorResource(id = R.color.teal)   // usa il tuo colore teal
+                                       colorResource(id = R.color.teal)
                                    else
                                        colorResource(id = R.color.b).copy(alpha = 0.3f),
                         fontSize = 16.sp,
@@ -203,29 +195,34 @@ fun RegionScreen(
                 }
             }
 
-            // Sottotitolo sotto la riga header — centrato e spostato in basso nell'area teal
-            Text(
-                text       = stringResource(id = R.string.choose_region_subtitle),
-                fontSize   = 17.sp,
-                fontFamily = robotoRegular,
-                color      = colorResource(id = R.color.b),
-                textAlign  = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier   = Modifier
+            // ── SUBTITLE ───────────────────────────────────────────────
+            Row (
+                modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp, start = 16.dp, end = 16.dp)
-            )
+                    .fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text       = stringResource(id = R.string.choose_region_subtitle),
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray,
+                    fontSize   = 18.sp,
+                    fontFamily = robotoSemiBold,
+                    modifier   = Modifier
+                        .fillMaxWidth()
+                )
+            }
         }
-        // ── END HEADER ───────────────────────────────────────────
 
-        // Card bianca in basso
+        // ── WHITE CARD ───────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight(0.70f)
                 .align(Alignment.BottomCenter)
                 .topShadow(
-                    color   = Color.Black.copy(alpha = 0.15f),
-                    blur    = 12.dp,
+                    color = Color.Black.copy(alpha = 0.15f),
+                    blur = 12.dp,
                     offsetY = (-6).dp
                 )
                 .background(
@@ -236,7 +233,7 @@ fun RegionScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            // Drag handle
+            // ── DRAG HANDLE ───────────────────────────────────────────────
             Box(
                 modifier = Modifier
                     .width(199.dp)
@@ -270,9 +267,6 @@ fun RegionScreen(
 
                 regions.chunked(2).forEach { rowItems ->
                     if (rowItems.size == 1) {
-                        // Arrangement.Center + fillMaxWidth(0.44f):
-                        // i bottoni accoppiati prendono (rowWidth - 40dp) / 2 ≈ 44% di rowWidth.
-                        // Questo replica la stessa larghezza e centra il bottone.
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center
@@ -313,7 +307,6 @@ fun RegionScreen(
                                 ) {
                                     Text(
                                         text     = stringResource(id = stringRes),
-                                        // ── FIX 2: fontSize ridotto per non sforare ──
                                         fontSize = 15.sp,
                                         fontFamily = robotoRegular,
                                         color    = colorResource(id = R.color.b),
@@ -326,7 +319,6 @@ fun RegionScreen(
                     }
                 }
 
-                // ── FIX 4: POV radio affiancati in Row ───────────────
                 val showPov = selectedRegion == R.string.arm || selectedRegion == R.string.leg
                 if (showPov) {
                     Row(
@@ -362,9 +354,6 @@ fun RegionScreen(
                         )
                     }
                 }
-                // ── END FIX 4 ────────────────────────────────────────
-
-                // ── FIX 3: Next button RIMOSSO da qui (ora è nell'header) ──
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }

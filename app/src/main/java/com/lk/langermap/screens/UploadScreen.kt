@@ -3,7 +3,6 @@ package com.lk.langermap.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,14 +18,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.lk.langermap.R
 import com.lk.langermap.ui.theme.*
-import java.net.URLEncoder
 
 @Preview
 @Composable
@@ -40,11 +38,8 @@ fun UploadScreen(
     onNavigateToOverlay: (String) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
-    val teal          = colorResource(id = R.color.teal)
-
     var selectedImageUri by remember { mutableStateOf(initialImageUri) }
 
-    // launcher per scegliere file dalla galleria
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
@@ -75,6 +70,7 @@ fun UploadScreen(
             }
             Text(
                 text       = "Upload patient image",
+                textAlign = TextAlign.Center,
                 fontSize   = 18.sp,
                 fontFamily = robotoSemiBold,
                 color      = Color.Black,
@@ -82,16 +78,26 @@ fun UploadScreen(
                     .weight(1f)
                     .padding(start = 8.dp)
             )
-            TextButton(onClick = {
-                selectedImageUri?.let { uri ->
-                    onNavigateToOverlay(uri.toString())
-                }
-            }) {
-                Text("Next", color = teal, fontSize = 16.sp)
+            TextButton(
+                onClick = {
+                    selectedImageUri?.let { uri -> onNavigateToOverlay(uri.toString()) }
+                },
+                enabled = selectedImageUri != null
+            ) {
+                Text(
+                    text     = stringResource(id = R.string.btn_next),
+                    color    = if (selectedImageUri != null)
+                        colorResource(id = R.color.teal)
+                    else
+                        colorResource(id = R.color.b).copy(alpha = 0.3f),
+                    fontSize = 16.sp,
+                    fontFamily = robotoSemiBold
+                )
             }
+
         }
 
-        // Chip regione selezionata
+        // ── REGION ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -118,7 +124,7 @@ fun UploadScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Riquadro upload / anteprima immagine
+        // ── IMAGE PREVIEW ───────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -167,7 +173,7 @@ fun UploadScreen(
 
         Spacer(modifier = Modifier.height(30.dp))
 
-        // Divider "or choose source"
+        // ── DIVIDER ───────────────────────────────────────────────
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.fillMaxWidth()
@@ -184,7 +190,7 @@ fun UploadScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Take photo
+        // ── "TAKE PHOTO" ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -212,7 +218,7 @@ fun UploadScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Upload from files
+        // ── "UPLOAD" ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -239,8 +245,9 @@ fun UploadScreen(
         }
 
         Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // Settings e Delete
+        // ── SETTINGS AND DELETE ───────────────────────────────────────────────
         Row(
             modifier = Modifier
                 .fillMaxWidth()
