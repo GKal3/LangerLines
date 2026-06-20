@@ -179,10 +179,10 @@ fun EditPhotoScreen(
                 }
             }
 
-            OutlinedButton(
+            Button(
                 onClick = { updateEdit(EditState()) },
                 shape  = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(
+                colors = ButtonDefaults.buttonColors(
                     contentColor   = black,
                     containerColor = lavLightTrasl
                 )

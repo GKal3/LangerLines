@@ -7,7 +7,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -42,7 +41,7 @@ fun BackHomeScreen(
             Icon(
                 painter = painterResource(id = R.drawable.ic_back_arrow),
                 contentDescription = "Back",
-                tint = Color.Black
+                tint = colorResource(id = R.color.b)
             )
         }
 
@@ -57,7 +56,7 @@ fun BackHomeScreen(
             Icon(
                 painter = painterResource(id = R.drawable.ic_complete),
                 contentDescription = null,
-                tint = Color.Black,
+                tint = colorResource(id = R.color.b),
                 modifier = Modifier.size(100.dp)
             )
 
@@ -67,7 +66,7 @@ fun BackHomeScreen(
                 text = "Session complete",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black
+                color = colorResource(id = R.color.b)
             )
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -76,7 +75,7 @@ fun BackHomeScreen(
                 text = "The Langer's lines have been applied and saved. The image is ready for clinical use.",
                 fontSize = 16.sp,
                 fontFamily = robotoRegular,
-                color = Color.Black,
+                color = colorResource(id = R.color.b),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
 
@@ -88,7 +87,7 @@ fun BackHomeScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.White
+                    containerColor = colorResource(id = R.color.w)
                 ),
                 shape = RoundedCornerShape(24.dp)
             ) {
@@ -96,7 +95,7 @@ fun BackHomeScreen(
                     text = "Start a new project",
                     fontSize = 18.sp,
                     fontFamily = robotoRegular,
-                    color = Color.Black
+                    color = colorResource(id = R.color.b)
                 )
             }
 
@@ -105,13 +104,18 @@ fun BackHomeScreen(
             Text(
                 text = buildAnnotatedString {
                     append("Thank you for using ")
-                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
+                    withStyle(
+                        style = SpanStyle(
+                            fontFamily = montserratSemiBold,
+                            fontWeight = FontWeight.Bold
+                        )
+                    ) {
                         append("Langer Map")
                     }
                 },
                 fontSize = 14.sp,
                 fontFamily = robotoRegular,
-                color = Color.Black
+                color = colorResource(id = R.color.b)
             )
         }
     }

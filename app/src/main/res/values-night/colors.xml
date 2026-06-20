@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="w">#1A1A1A</color>
+    <color name="b">#F2F2F2</color>
+    <color name="b_trasl">#33FFFFFF</color>
+    <color name="gray">#FFB0B0B0</color>
+    <color name="grey">#3A3A3A</color>
+    <color name="l_grey">#2C2C2C</color>
+    <color name="l_grey_trasl">#B32C2C2C</color>
+
+    <!-- Teal -->
+    <color name="teal_light">#0E2B2C</color>
+    <color name="teal_dark">#79E9EE</color>
+    <color name="teal">#1C4D4F</color>
+    <color name="teal_deact">#163C3E</color>
+
+    <!-- Lavender -->
+    <color name="lav_light">#6E4B7A</color>
+    <color name="lav_light_trasl">#886E4B7A</color>
+</resources>

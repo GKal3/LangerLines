@@ -19,7 +19,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -52,8 +51,6 @@ fun OutputScreen(
     var selectedFormat by remember { mutableStateOf("PNG") }
     val formats = listOf("PNG", "JPEG", "PDF")
 
-    val black = colorResource(id = R.color.b)
-
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
     var photoIntrinsicSize by remember { mutableStateOf<IntSize?>(null) }
 
@@ -82,7 +79,7 @@ fun OutputScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(colorResource(id = R.color.w))
             .statusBarsPadding()
             .pointerInput(Unit) { detectTapGestures { } },
         horizontalAlignment = Alignment.CenterHorizontally
@@ -102,7 +99,7 @@ fun OutputScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_back_arrow),
                     contentDescription = "Back",
-                    tint = black
+                    tint = colorResource(id = R.color.b)
                 )
             }
 
@@ -112,7 +109,7 @@ fun OutputScreen(
                 textAlign = TextAlign.Center,
                 fontSize = 20.sp,
                 fontFamily = robotoSemiBold,
-                color = black
+                color = colorResource(id = R.color.b)
             )
         }
 
@@ -125,7 +122,7 @@ fun OutputScreen(
             Text(
                 text       = "Save or share the final image",
                 textAlign = TextAlign.Center,
-                color = Color.Gray,
+                color = colorResource(id = R.color.gray),
                 fontSize   = 18.sp,
                 fontFamily = robotoSemiBold,
                 modifier   = Modifier
@@ -201,7 +198,7 @@ fun OutputScreen(
             Text(
                 text = "download options",
                 fontSize = 12.sp,
-                color = Color.Gray,
+                color = colorResource(id = R.color.gray),
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
             HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light))
@@ -269,14 +266,14 @@ fun OutputScreen(
                     painter = painterResource(id = R.drawable.ic_download_arrow),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = Color.Black
+                    tint = colorResource(id = R.color.b)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = if (selectedFormat == "PDF") "Save to file" else "Save to gallery",
                     fontSize = 15.sp,
                     fontFamily = robotoRegular,
-                    color = Color.Black
+                    color = colorResource(id = R.color.b)
                 )
             }
 
@@ -294,14 +291,14 @@ fun OutputScreen(
                     painter = painterResource(id = R.drawable.ic_share),
                     contentDescription = null,
                     modifier = Modifier.size(18.dp),
-                    tint = Color.Black
+                    tint = colorResource(id = R.color.b)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
                     text = "Share",
                     fontSize = 15.sp,
                     fontFamily = robotoRegular,
-                    color = Color.Black
+                    color = colorResource(id = R.color.b)
                 )
             }
         }

@@ -49,20 +49,9 @@ fun SexScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colorResource(id = R.color.w))
+            .background(colorResource(id = R.color.teal_light))
             .statusBarsPadding()
     ) {
-
-        // ── GRADIENT ───────────────────────────────────────────────
-        Image(
-            painter = painterResource(id = R.drawable.gradient1),
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.5f)
-                .align(Alignment.TopCenter)
-        )
 
         // ── HEADER ───────────────────────────────────────────────
         Column(
@@ -80,7 +69,8 @@ fun SexScreen(
                 Text(
                     text = stringResource(id = R.string.app_name),
                     fontSize = 10.sp,
-                    fontFamily = montserratSemiBold
+                    fontFamily = montserratSemiBold,
+                    color = colorResource(id = R.color.teal_dark)
                 )
             }
 
@@ -102,7 +92,7 @@ fun SexScreen(
                 .fillMaxHeight(0.70f)
                 .align(Alignment.BottomCenter)
                 .topShadow(
-                    color = Color.Black.copy(alpha = 0.15f),
+                    color = colorResource(id = R.color.b).copy(alpha = 0.15f),
                     blur = 12.dp,
                     offsetY = (-6).dp
                 )

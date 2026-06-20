@@ -132,20 +132,9 @@ fun RegionScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colorResource(id = R.color.w))
+            .background(colorResource(id = R.color.teal_light))
             .statusBarsPadding()
     ) {
-
-        Image(
-            painter = painterResource(id = R.drawable.gradient1),
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.5f)
-                .align(Alignment.TopCenter)
-        )
-
         // ── HEADER ───────────────────────────────────────────────
         Column(
             modifier = Modifier
@@ -205,7 +194,7 @@ fun RegionScreen(
                 Text(
                     text       = stringResource(id = R.string.choose_region_subtitle),
                     textAlign = TextAlign.Center,
-                    color = Color.Gray,
+                    color = colorResource(id = R.color.gray),
                     fontSize   = 18.sp,
                     fontFamily = robotoSemiBold,
                     modifier   = Modifier
@@ -221,7 +210,7 @@ fun RegionScreen(
                 .fillMaxHeight(0.70f)
                 .align(Alignment.BottomCenter)
                 .topShadow(
-                    color = Color.Black.copy(alpha = 0.15f),
+                    color = colorResource(id = R.color.b).copy(alpha = 0.15f),
                     blur = 12.dp,
                     offsetY = (-6).dp
                 )
@@ -337,7 +326,8 @@ fun RegionScreen(
                         Text(
                             text       = "Front POV",
                             fontFamily = robotoRegular,
-                            fontSize   = 14.sp
+                            fontSize   = 14.sp,
+                            color = colorResource(id = R.color.b)
                         )
                         Spacer(modifier = Modifier.width(24.dp))
                         RadioButton(
@@ -350,7 +340,8 @@ fun RegionScreen(
                         Text(
                             text       = "Back POV",
                             fontFamily = robotoRegular,
-                            fontSize   = 14.sp
+                            fontSize   = 14.sp,
+                            color = colorResource(id = R.color.b)
                         )
                     }
                 }

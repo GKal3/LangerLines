@@ -50,7 +50,7 @@ fun UploadScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(colorResource(id = R.color.w))
             .statusBarsPadding()
     ) {
 
@@ -65,7 +65,8 @@ fun UploadScreen(
             IconButton(onClick = onBack) {
                 Icon(
                     painter            = painterResource(id = R.drawable.ic_back_arrow),
-                    contentDescription = "Back"
+                    contentDescription = "Back",
+                    tint = colorResource(id = R.color.b)
                 )
             }
             Text(
@@ -73,7 +74,7 @@ fun UploadScreen(
                 textAlign = TextAlign.Center,
                 fontSize   = 18.sp,
                 fontFamily = robotoSemiBold,
-                color      = Color.Black,
+                color      = colorResource(id = R.color.b),
                 modifier   = Modifier
                     .weight(1f)
                     .padding(start = 8.dp)
@@ -165,7 +166,7 @@ fun UploadScreen(
                         text = "JPEG, PNG -- max 10 MB",
                         fontFamily = robotoRegular,
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = colorResource(id = R.color.gray)
                     )
                 }
             }
@@ -182,7 +183,7 @@ fun UploadScreen(
             Text(
                 text = "or choose source",
                 fontSize = 12.sp,
-                color = Color.Gray,
+                color = colorResource(id = R.color.gray),
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
             HorizontalDivider(modifier = Modifier.weight(1f), color = colorResource(id = R.color.lav_light))
@@ -196,7 +197,7 @@ fun UploadScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .background(
-                    color = Color.LightGray.copy(alpha = 0.4f),
+                    color = colorResource(id = R.color.l_grey_trasl),
                     shape = RoundedCornerShape(12.dp)
                 )
                 .clickable { onNavigateToCamera() }
@@ -206,12 +207,14 @@ fun UploadScreen(
             Icon(
                 painter = painterResource(id = R.drawable.ic_take_photo),
                 contentDescription = null,
+                tint = colorResource(id = R.color.b),
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "Take photo with camera",
                 fontFamily = robotoRegular,
+                color = colorResource (id = R.color.b),
                 fontSize = 16.sp
             )
         }
@@ -224,7 +227,7 @@ fun UploadScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp)
                 .background(
-                    color = Color.LightGray.copy(alpha = 0.4f),
+                    color = colorResource(id = R.color.l_grey_trasl),
                     shape = RoundedCornerShape(12.dp)
                 )
                 .clickable { filePickerLauncher.launch("image/*") }
@@ -234,12 +237,14 @@ fun UploadScreen(
             Icon(
                 painter = painterResource(id = R.drawable.ic_upload_file),
                 contentDescription = null,
+                tint = colorResource(id = R.color.b),
                 modifier = Modifier.size(24.dp)
             )
             Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = "Upload from files",
                 fontFamily = robotoRegular,
+                color = colorResource (id = R.color.b),
                 fontSize = 16.sp
             )
         }

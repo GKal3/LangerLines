@@ -350,10 +350,11 @@ fun OverlayScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_rotation),
                     contentDescription = null,
+                    tint = black,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Rotation", fontSize = 14.sp, fontFamily = robotoRegular)
+                Text("Rotation", fontSize = 14.sp, fontFamily = robotoRegular, color = black)
                 Slider(
                     value = rotation,
                     onValueChange = { saveHistory(); rotation = it },
@@ -371,10 +372,11 @@ fun OverlayScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_opacity),
                     contentDescription = null,
+                    tint = black,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Opacity", fontSize = 14.sp, fontFamily = robotoRegular)
+                Text("Opacity", fontSize = 14.sp, fontFamily = robotoRegular, color  = black)
                 Slider(
                     value = opacity,
                     onValueChange = { saveHistory(); opacity = it },
@@ -395,10 +397,11 @@ fun OverlayScreen(
                 Icon(
                     painter = painterResource(id = R.drawable.ic_colorwheel),
                     contentDescription = null,
+                    tint = black,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Color", fontSize = 14.sp, fontFamily = robotoRegular)
+                Text("Color", fontSize = 14.sp, fontFamily = robotoRegular, color = black)
                 Spacer(modifier = Modifier.width(55.dp))
                 colorOptions.forEach { color ->
                     Box(
